@@ -191,7 +191,7 @@ Every target has a `format` and a `path`, plus an optional `id` (needed when two
 |---|---|
 | `missing` | No translation yet |
 | `untracked` | A translation exists that Localship didn't record (written before you adopted it) |
-| `stale` | The source text changed after the translation was made |
+| `stale` | The source text changed after the translation was made. If a person had also edited the translation, it is marked `editedByHand` in batches and is never replaced or removed without `--force`; `translate` holds it for review |
 | `edited` | The translation was changed outside Localship; it is kept and never overwritten |
 | `draft` | Not reviewed yet, including gettext `fuzzy` and Xcode `needs_review` |
 | `reviewed`, `approved` | Checked by an AI reviewer or a person |

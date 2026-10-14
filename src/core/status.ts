@@ -33,6 +33,15 @@ export function entryState(
   return lock.state;
 }
 
+/**
+ * The translation on disk differs from what the tool last wrote: a person changed it. Checked
+ * separately from staleness, since a source change and a hand edit can happen together, and the
+ * edit must still be protected.
+ */
+export function editedByHand(target: Entry | undefined, lock: LockEntry | undefined): boolean {
+  return !!target && !!lock && lock.target !== hashMessage(target.message);
+}
+
 export interface LocaleStatus {
   target: string;
   locale: string;

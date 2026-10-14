@@ -6,7 +6,7 @@ import { hashMessage } from "./hash.js";
 import { getLockEntry, type Lockfile, type StoredState, setLockEntry, writeLock } from "./lock.js";
 import { displayKey, type Entry, type Message, messageValues } from "./model.js";
 import { findTarget, type Project, projectLocales, reopenProject } from "./project.js";
-import { type EntryState, entryState } from "./status.js";
+import { type EntryState, editedByHand, entryState } from "./status.js";
 import { buildUsageIndex, type Usage, type UsageIndex } from "./usage.js";
 import { checkTranslation, type Found } from "./validate.js";
 
@@ -31,6 +31,11 @@ export interface BatchItem {
   current?: MessageValue;
   /** For stale entries: the source text `current` was translated from, when the lockfile knows it. */
   previousSource?: MessageValue;
+  /**
+   * A person edited `current` after the tool wrote it. Keep their wording where you can;
+   * replacing it needs their confirmation (`force`).
+   */
+  editedByHand?: true;
   /** Plural forms this locale needs, with sample counts for each. */
   pluralForms?: Array<{ form: string; examples: string; optional?: boolean }>;
   /** Placeholders the translation must keep. */
@@ -62,6 +67,8 @@ export interface BatchOptions {
   skip?: Set<string>;
   /** Where strings are used in code; built when not given. false leaves it out. */
   usages?: UsageIndex | false;
+  /** Leave out stale entries a person also edited (for unattended runs that can't ask). */
+  skipHandEdited?: boolean;
 }
 
 /** Identity of an entry in one locale, for tracking across batches. */
@@ -153,6 +160,8 @@ export async function nextBatch(project: Project, opts: BatchOptions = {}): Prom
         const lockEntry = getLockEntry(project.lock, target.id, locale, src.key);
         const state = entryState(src, tgt, lockEntry);
         if (!states.includes(state)) continue;
+        const handEdited = state === "stale" && editedByHand(tgt, lockEntry);
+        if (handEdited && opts.skipHandEdited) continue;
         if (opts.skip?.has(itemId({ target: target.id, locale, key: displayKey(src.key) })))
           continue;
         matched++;
@@ -184,6 +193,7 @@ export async function nextBatch(project: Project, opts: BatchOptions = {}): Prom
           ...(state === "stale" && lockEntry?.sourceText !== undefined
             ? { previousSource: lockEntry.sourceText }
             : {}),
+          ...(handEdited ? { editedByHand: true as const } : {}),
           ...(src.message.kind === "plural" && spec
             ? {
                 pluralForms: spec.forms
@@ -379,7 +389,16 @@ export async function submit(
     seen.add(id);
 
     const existing = target.locales.get(locale)?.entries.get(src.key);
-    const state = entryState(src, existing, getLockEntry(project.lock, target.id, locale, src.key));
+    const lockEntry = getLockEntry(project.lock, target.id, locale, src.key);
+    const state = entryState(src, existing, lockEntry);
+    if (!opts.force && state === "stale" && editedByHand(existing, lockEntry)) {
+      reject(
+        "The source changed, but a person also edited this translation; ask before replacing their edit (force)",
+        "state-stale-edited",
+        target.id,
+      );
+      continue;
+    }
     if (!opts.force && !REPLACEABLE.includes(state)) {
       reject(
         `Already ${state === "untracked" ? "translated (not by this tool)" : state}; pass force to replace it`,
@@ -703,10 +722,12 @@ export async function removeTranslations(
         if (wanted && !wanted.has(src.key) && !wanted.has(displayKey(src.key))) continue;
         const tgt = catalog.entries.get(src.key);
         if (!tgt) continue;
-        const state = entryState(src, tgt, getLockEntry(project.lock, target.id, locale, src.key));
+        const lockEntry = getLockEntry(project.lock, target.id, locale, src.key);
+        const state = entryState(src, tgt, lockEntry);
         if (opts.states && !opts.states.includes(state)) continue;
         const at = { target: target.id, locale, key: displayKey(src.key) };
-        if (!opts.force && !DISPOSABLE.includes(state)) {
+        const protectedEdit = state === "stale" && editedByHand(tgt, lockEntry);
+        if (!opts.force && (protectedEdit || !DISPOSABLE.includes(state))) {
           result.refused.push({ ...at, state });
           continue;
         }

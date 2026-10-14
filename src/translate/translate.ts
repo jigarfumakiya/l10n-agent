@@ -35,6 +35,8 @@ export interface TranslateOptions {
 
 export interface TranslateResult {
   translated: number;
+  /** Stale strings a person had edited: left for review instead of being replaced. */
+  heldForReview: Array<{ target: string; locale: string; key: string }>;
   failed: Array<{ target: string; locale: string; key: string; errors: string[] }>;
   files: string[];
   models: Record<string, string>;
@@ -85,7 +87,13 @@ export async function translateProject(
   };
   for (const m of new Set(Object.values(models))) client(m);
 
-  const result: TranslateResult = { translated: 0, failed: [], files: [], models };
+  const result: TranslateResult = {
+    translated: 0,
+    heldForReview: [],
+    failed: [],
+    files: [],
+    models,
+  };
   const files = new Set<string>();
   const tries = new Map<string, RetryInfo & { count: number; item: BatchItem }>();
   const givenUp = new Set<string>();
@@ -108,6 +116,7 @@ export async function translateProject(
           offset,
           skip: givenUp,
           usages,
+          skipHandEdited: !opts.force,
         });
         if (batch.items.length === 0) break;
         round.push(batch);
@@ -221,6 +230,19 @@ export async function translateProject(
       });
   }
   result.files = [...files].sort();
+  if (!opts.force) {
+    const held = await nextBatch(project, {
+      locales,
+      targets: opts.targets,
+      keys: opts.keys,
+      states: ["stale"],
+      limit: Number.MAX_SAFE_INTEGER,
+      usages: false,
+    });
+    result.heldForReview = held.items
+      .filter((i) => i.editedByHand)
+      .map(({ target, locale, key }) => ({ target, locale, key }));
+  }
   return result;
 }
 

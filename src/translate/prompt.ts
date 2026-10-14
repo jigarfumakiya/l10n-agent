@@ -10,6 +10,7 @@ export const TRANSLATION_RULES = `- Translate the source text of each item into 
 - Plurals: return an object with exactly the forms in pluralForms (no more, no fewer). examples lists the counts that select each form; write each form so it is grammatical for those counts. A form whose only example is one number may spell it out instead of using the placeholder.
 - String arrays: return an array with the same number of items, in order.
 - stale items have a current translation made for an older source text, shown as previousSource when known: see what changed between previousSource and source, and change the translation only that much.
+- editedByHand means a person changed the current translation after it was made. Keep their wording wherever the source change allows.
 - rejected shows your previous answer for that item and why it was refused. Fix exactly those problems.
 - Keep length close to the source where you can; buttons and tabs have little room.`;
 

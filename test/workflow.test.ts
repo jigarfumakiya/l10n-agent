@@ -486,3 +486,92 @@ describe("prune", () => {
     expect((await prune(await open(fs))).removed).toEqual([]);
   });
 });
+
+describe("a source change after a hand edit", () => {
+  // The release test: change source strings, one of which a person had edited, and check
+  // that both are flagged but the hand edit survives every path that writes.
+  async function setup() {
+    const fs = project();
+    await submit(await open(fs), [
+      { locale: "hi", key: "save", value: "सहेजें" },
+      { locale: "hi", key: "cancel", value: "रद्द करें" },
+    ]);
+    const hi = "/p/app/src/main/res/values-hi/strings.xml";
+    fs.files.set(hi, (fs.files.get(hi) ?? "").replace("सहेजें", "सेव करें"));
+    const src = "/p/app/src/main/res/values/strings.xml";
+    fs.files.set(
+      src,
+      (fs.files.get(src) ?? "")
+        .replace(">Save<", ">Save budget<")
+        .replace(">Cancel<", ">Cancel edit<"),
+    );
+    return { fs, hi };
+  }
+
+  it("flags both as stale and marks the hand-edited one", async () => {
+    const { fs } = await setup();
+    const states = computeStatus(await open(fs), ["hi"]).find((s) => s.target === "android");
+    expect(states?.entries.filter((e) => e.state === "stale").map((e) => e.key)).toEqual([
+      "save",
+      "cancel",
+    ]);
+    const batch = await nextBatch(await open(fs), { locales: ["hi"], targets: ["android"] });
+    const save = batch.items.find((i) => i.key === "save");
+    expect(save).toMatchObject({ current: "सेव करें", previousSource: "Save", editedByHand: true });
+    expect(batch.items.find((i) => i.key === "cancel")?.editedByHand).toBeUndefined();
+  });
+
+  it("won't replace or remove the hand edit without force", async () => {
+    const { fs, hi } = await setup();
+    const r = await submit(await open(fs), [
+      { locale: "hi", key: "save", value: "बजट सहेजें" },
+      { locale: "hi", key: "cancel", value: "बदलाव रद्द करें" },
+    ]);
+    expect(r.accepted.map((a) => a.key)).toEqual(["cancel"]);
+    expect(r.rejected[0]?.errors[0]?.code).toBe("state-stale-edited");
+    expect(fs.files.get(hi)).toContain("सेव करें");
+    const removed = await removeTranslations(await open(fs), { locales: ["hi"], keys: ["save"] });
+    expect(removed.refused).toEqual([
+      { target: "android", locale: "hi", key: "save", state: "stale" },
+    ]);
+    const forced = await submit(await open(fs), [{ locale: "hi", key: "save", value: "बजट सहेजें" }], {
+      force: true,
+    });
+    expect(forced.accepted).toHaveLength(1);
+  });
+
+  it("is held for review by unattended translation", async () => {
+    const { fs, hi } = await setup();
+    const model = () => async (req: { user: string }) => {
+      const items = JSON.parse(
+        req.user.slice(req.user.indexOf("Items to translate:") + 19),
+      ) as Array<{
+        target: string;
+        locale: string;
+        key: string;
+        kind: string;
+      }>;
+      return JSON.stringify(
+        items.map((i) => ({
+          ...i,
+          value:
+            i.kind === "plural"
+              ? { one: "%d दिन", other: "%d दिन" }
+              : i.key === "welcome"
+                ? "StillMoney, %1$s"
+                : "अनुवाद",
+        })),
+      );
+    };
+    const { translateProject } = await import("../src/translate/translate.js");
+    const r = await translateProject(await open(fs), {
+      locales: ["hi"],
+      targets: ["android"],
+      model: "fake:m",
+      completion: model,
+    });
+    expect(r.heldForReview).toEqual([{ target: "android", locale: "hi", key: "save" }]);
+    expect(fs.files.get(hi)).toContain("सेव करें");
+    expect(fs.files.get(hi)).not.toContain("रद्द करें");
+  });
+});

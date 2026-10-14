@@ -44,7 +44,10 @@ come out generic.
    - `placeholders`, `glossary` (`keep` = leave as written, `use` = required translation),
      `memory` (how the same text was translated elsewhere in the project);
    - `state: stale` with `current` (the old translation) and `previousSource` (the text it was
-     translated from) — change the translation only as much as the source changed.
+     translated from) — change the translation only as much as the source changed;
+   - `editedByHand: true` — a person edited the current translation. Keep their wording where you
+     can, and show the user your proposed change: `submit` refuses it until they agree (then pass
+     `--force` for just those strings).
    The batch also carries the `brief`, each locale's `voice`, and notes per format.
 
 2. Translate every item following these rules:

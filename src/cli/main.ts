@@ -355,6 +355,11 @@ program
         for (const f of result.failed) {
           console.log(`  ✖ ${f.locale} ${f.key}: ${f.errors.join("; ")}`);
         }
+        for (const h of result.heldForReview) {
+          console.log(
+            `  ✋ ${h.locale} ${h.key}: source changed, but a person edited the translation; review it, or rerun with --force`,
+          );
+        }
         for (const f of result.files) console.log(`  ${f}`);
         if (result.translated > 0) {
           console.log("Next: `localship validate`, review the drafts, then `localship approve`.");
