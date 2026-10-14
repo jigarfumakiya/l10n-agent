@@ -1,7 +1,7 @@
 {
   "name": "l10n-agent",
   "version": "0.0.0",
-  "description": "Local-first, agent-native localization for mobile apps. Your repo is the translation system; your model is the translator.",
+  "description": "Local-first, agent-native localization for apps. Your repo is the translation system; your model is the translator.",
   "license": "MIT",
   "type": "module",
   "bin": {
