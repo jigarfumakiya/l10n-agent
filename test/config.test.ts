@@ -6,7 +6,7 @@ describe("config", () => {
   it("finds the nearest config and canonicalizes locales", async () => {
     const fs = memoryFs({
       "/app/l10n.config.yaml":
-        "locales: [HI, pt-br]\ntargets:\n  - format: android-xml\n    res: res\n",
+        "locales: [HI, pt-br]\ntargets:\n  - format: android-xml\n    path: res\n",
     });
     const { config, root } = await loadConfig(fs, "/app/src/deep");
     expect(root).toBe("/app");

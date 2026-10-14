@@ -1,18 +1,21 @@
 import path from "node:path";
 import { androidAdapter } from "../formats/android/adapter.js";
-import type { FormatAdapter, LoadedTarget } from "../formats/types.js";
-import { type Config, loadConfig, type TargetConfig } from "./config.js";
+import { poAdapter } from "../formats/po/adapter.js";
+import type { FormatAdapter, Target } from "../formats/types.js";
+import { type Config, loadConfig, type TargetConfig, targetId } from "./config.js";
 import type { FileSystem } from "./fs.js";
 import { type Lockfile, readLock } from "./lock.js";
 
-const ADAPTERS: Record<TargetConfig["format"], FormatAdapter<never>> = {
-  "android-xml": androidAdapter as FormatAdapter<never>,
+const ADAPTERS: {
+  [F in TargetConfig["format"]]: FormatAdapter<Extract<TargetConfig, { format: F }>>;
+} = {
+  "android-xml": androidAdapter,
+  po: poAdapter,
 };
 
 export interface ProjectTarget {
   config: TargetConfig;
-  adapter: FormatAdapter<never>;
-  loaded: LoadedTarget;
+  target: Target;
 }
 
 export interface Project {
@@ -33,9 +36,9 @@ export async function openProject(
   const lockFile = path.resolve(root, config.lock);
   const targets: ProjectTarget[] = [];
   for (const t of config.targets) {
-    const adapter = ADAPTERS[t.format];
-    const loaded = await adapter.load(fs, root, t as never, config.sourceLocale);
-    targets.push({ config: t, adapter, loaded });
+    const adapter = ADAPTERS[t.format] as FormatAdapter<TargetConfig>;
+    const ctx = { fs, root, sourceLocale: config.sourceLocale, id: targetId(t, config.targets) };
+    targets.push({ config: t, target: await adapter.open(t, ctx) });
   }
   return {
     config,
@@ -52,6 +55,6 @@ export async function openProject(
 export function projectLocales(project: Project): string[] {
   if (project.config.locales.length > 0) return project.config.locales;
   const found = new Set<string>();
-  for (const t of project.targets) for (const l of t.loaded.locales.keys()) found.add(l);
+  for (const { target } of project.targets) for (const l of target.locales.keys()) found.add(l);
   return [...found].sort();
 }

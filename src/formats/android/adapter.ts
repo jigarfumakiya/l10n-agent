@@ -7,7 +7,8 @@ import {
   PLURAL_CATEGORIES,
   type PluralCategory,
 } from "../../core/model.js";
-import type { FormatAdapter, LoadedTarget } from "../types.js";
+import { cldrPluralSpec } from "../../core/plurals.js";
+import type { FormatAdapter, Target, WriteResult } from "../types.js";
 import { folderToLocale, localeToFolder } from "./folders.js";
 import { analyzeAndroidValue, isReference } from "./value.js";
 import {
@@ -25,42 +26,45 @@ export interface AndroidTarget {
   id?: string;
   format: "android-xml";
   /** Resource directory, relative to the project root (e.g. `app/src/main/res`). */
-  res: string;
+  path: string;
 }
 
 const XLIFF_NS = "urn:oasis:names:tc:xliff:document:1.2";
 /** Entry attributes carried through a round trip. `name` and `translatable` are modeled. */
 const KEPT_ATTRS = ["formatted", "product", "tools:ignore"];
 
-interface FileInfo {
-  rootAttrs: Array<[string, string]>;
-}
-const fileInfo = new WeakMap<LoadedTarget, Map<string, FileInfo>>();
-
 export const androidAdapter: FormatAdapter<AndroidTarget> = {
   format: "android-xml",
 
-  async load(fs, root, target, sourceLocale) {
-    const resDir = path.resolve(root, target.res);
-    const loaded: LoadedTarget = {
-      id: target.id ?? "android",
+  async open(config, { fs, root, sourceLocale, id }) {
+    const resDir = path.resolve(root, config.path);
+    const source: Catalog = { locale: sourceLocale, entries: new Map() };
+    const locales = new Map<string, Catalog>();
+    const issues: Issue[] = [];
+    /** Root element attributes per file, so rewritten files keep their namespaces. */
+    const rootAttrs = new Map<string, Array<[string, string]>>();
+
+    const target: Target = {
+      id,
       format: "android-xml",
-      label: target.res,
-      source: { locale: sourceLocale, entries: new Map() },
-      locales: new Map(),
-      issues: [],
+      label: config.path,
+      source,
+      locales,
+      issues,
+      analyze: (value, entry) =>
+        analyzeAndroidValue(value, { formatted: entry.attrs?.formatted !== "false" }),
+      pluralSpec: (locale) => cldrPluralSpec(locale),
+      writeLocale: (catalog) => writeLocale(catalog),
     };
-    const files = new Map<string, FileInfo>();
-    fileInfo.set(loaded, files);
 
     if (!(await fs.exists(resDir))) {
-      loaded.issues.push({
+      issues.push({
         severity: "error",
         code: "target-missing",
-        message: `Resource directory not found: ${target.res}`,
-        target: loaded.id,
+        message: `Resource directory not found: ${config.path}`,
+        target: id,
       });
-      return loaded;
+      return target;
     }
 
     const dirs = (await fs.listDir(resDir))
@@ -70,7 +74,7 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
     for (const dir of dirs) {
       const locale = folderToLocale(dir);
       if (locale === undefined) continue;
-      const catalog: Catalog = locale === null ? loaded.source : { locale, entries: new Map() };
+      const catalog: Catalog = locale === null ? source : { locale, entries: new Map() };
       const xmlFiles = (await fs.listDir(path.join(resDir, dir)))
         .filter((f) => !f.isDirectory && f.name.endsWith(".xml"))
         .map((f) => f.name)
@@ -78,80 +82,71 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
       for (const name of xmlFiles) {
         const abs = path.join(resDir, dir, name);
         const rel = path.relative(root, abs);
-        const src = await fs.readFile(abs);
         let doc: XmlDocument;
         try {
-          doc = parseXml(src);
+          doc = parseXml(await fs.readFile(abs));
         } catch (e) {
           if (!(e instanceof XmlError)) throw e;
-          loaded.issues.push({
+          issues.push({
             severity: "error",
             code: "xml-malformed",
             message: e.message.replace(/ \(line \d+\)$/, ""),
-            target: loaded.id,
+            target: id,
             locale: locale ?? sourceLocale,
             file: rel,
             line: e.line,
           });
           continue;
         }
-        if (doc.root?.name !== "resources") continue;
+        const resources = doc.root;
+        if (resources?.name !== "resources") continue;
         const before = catalog.entries.size;
-        readEntries(doc, doc.root, rel, catalog, (issue) =>
-          loaded.issues.push({ ...issue, target: loaded.id, locale: locale ?? sourceLocale }),
+        readEntries(doc, resources, rel, catalog, (issue) =>
+          issues.push({ ...issue, target: id, locale: locale ?? sourceLocale }),
         );
         if (catalog.entries.size > before || locale === null) {
-          files.set(abs, {
-            rootAttrs: doc.root.attrOrder.map((a) => [a, doc.root?.attrs[a] ?? ""]),
-          });
+          rootAttrs.set(
+            abs,
+            resources.attrOrder.map((a) => [a, resources.attrs[a] ?? ""]),
+          );
         }
       }
-      if (locale !== null && catalog.entries.size > 0) loaded.locales.set(locale, catalog);
-    }
-    return loaded;
-  },
-
-  analyze(value, entry) {
-    return analyzeAndroidValue(value, { formatted: entry.attrs?.formatted !== "false" });
-  },
-
-  async writeLocale(fs, root, target, loaded, catalog) {
-    const resDir = path.resolve(root, target.res);
-    const folder = path.join(resDir, localeToFolder(catalog.locale));
-    const existing = loaded.locales.get(catalog.locale)?.entries ?? new Map<string, Entry>();
-    const infos = fileInfo.get(loaded) ?? new Map<string, FileInfo>();
-
-    // Each key stays in the locale file it already lives in; new keys follow the source file name.
-    const byFile = new Map<string, Entry[]>();
-    const place = (abs: string, entry: Entry) => {
-      const list = byFile.get(abs) ?? [];
-      list.push(entry);
-      byFile.set(abs, list);
-    };
-    const merged = new Map(existing);
-    for (const [k, e] of catalog.entries) merged.set(k, e);
-
-    const sourceOrder = [...loaded.source.entries.keys()];
-    const orphans = [...merged.keys()].filter((k) => !loaded.source.entries.has(k));
-    for (const key of [...sourceOrder, ...orphans]) {
-      const entry = merged.get(key);
-      if (!entry) continue;
-      const src = loaded.source.entries.get(key);
-      const prior = existing.get(key);
-      const file = prior
-        ? path.resolve(root, prior.file)
-        : path.join(folder, path.basename(src?.file ?? "strings.xml"));
-      place(file, { ...entry, attrs: entry.attrs ?? src?.attrs });
+      if (locale !== null && catalog.entries.size > 0) locales.set(locale, catalog);
     }
 
-    const written: string[] = [];
-    for (const [abs, entries] of byFile) {
-      const sourceFile = path.join(resDir, "values", path.basename(abs));
-      const rootAttrs = [...(infos.get(abs)?.rootAttrs ?? infos.get(sourceFile)?.rootAttrs ?? [])];
-      await fs.writeFile(abs, serializeResources(entries, rootAttrs));
-      written.push(path.relative(root, abs));
+    async function writeLocale(catalog: Catalog): Promise<WriteResult> {
+      const folder = path.join(resDir, localeToFolder(catalog.locale));
+      const existing = locales.get(catalog.locale)?.entries ?? new Map<string, Entry>();
+
+      // Each key stays in the locale file it already lives in; new keys follow the source file name.
+      const byFile = new Map<string, Entry[]>();
+      const merged = new Map(existing);
+      for (const [k, e] of catalog.entries) merged.set(k, e);
+      const orphans = [...merged.keys()].filter((k) => !source.entries.has(k));
+      for (const key of [...source.entries.keys(), ...orphans]) {
+        const entry = merged.get(key);
+        if (!entry) continue;
+        const src = source.entries.get(key);
+        const prior = existing.get(key);
+        const file = prior
+          ? path.resolve(root, prior.file)
+          : path.join(folder, path.basename(src?.file ?? "strings.xml"));
+        const list = byFile.get(file) ?? [];
+        list.push({ ...entry, attrs: entry.attrs ?? src?.attrs });
+        byFile.set(file, list);
+      }
+
+      const written: string[] = [];
+      for (const [abs, entries] of byFile) {
+        const sourceFile = path.join(resDir, "values", path.basename(abs));
+        const attrs = [...(rootAttrs.get(abs) ?? rootAttrs.get(sourceFile) ?? [])];
+        await fs.writeFile(abs, serializeResources(entries, attrs));
+        written.push(path.relative(root, abs));
+      }
+      return { files: written };
     }
-    return { files: written };
+
+    return target;
   },
 };
 
@@ -227,10 +222,10 @@ function readMessage(doc: XmlDocument, el: XmlElement): Message | undefined {
     case "string":
       return { kind: "text", value: innerRaw(doc, el) };
     case "plurals": {
-      const forms: Partial<Record<PluralCategory, string>> = {};
+      const forms: Record<string, string> = {};
       for (const item of childElements(el)) {
-        const q = item.attrs.quantity as PluralCategory | undefined;
-        if (item.name === "item" && q && PLURAL_CATEGORIES.includes(q))
+        const q = item.attrs.quantity;
+        if (item.name === "item" && q && PLURAL_CATEGORIES.includes(q as PluralCategory))
           forms[q] = innerRaw(doc, item);
       }
       return { kind: "plural", forms };

@@ -1,7 +1,12 @@
-import type { FormatAdapter } from "../formats/types.js";
+import type { Target } from "../formats/types.js";
 import { hashMessage } from "./hash.js";
-import type { Entry, Issue, PluralCategory, ValueAnalysis } from "./model.js";
-import { COUNT_IMPLIED_CATEGORIES, pluralCategories } from "./plurals.js";
+import {
+  type Entry,
+  type Issue,
+  messageValues,
+  type PluralSpec,
+  type ValueAnalysis,
+} from "./model.js";
 import { type Project, projectLocales } from "./project.js";
 
 export interface ValidateOptions {
@@ -14,7 +19,7 @@ export interface ValidateOptions {
 export function validateProject(project: Project, opts: ValidateOptions = {}): Issue[] {
   const locales = opts.locales ?? projectLocales(project);
   const issues: Issue[] = [];
-  for (const { loaded, adapter } of project.targets) {
+  for (const { target: loaded } of project.targets) {
     issues.push(...loaded.issues);
     const at = (e: Entry, locale: string) => ({
       target: loaded.id,
@@ -27,7 +32,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
     for (const src of loaded.source.entries.values()) {
       if (!src.translatable) continue;
       issues.push(
-        ...checkSource(adapter, src).map((i) => ({ ...at(src, loaded.source.locale), ...i })),
+        ...checkSource(loaded, src).map((i) => ({ ...at(src, loaded.source.locale), ...i })),
       );
     }
 
@@ -42,6 +47,17 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
           locale,
         });
         continue;
+      }
+      const spec = loaded.pluralSpec(locale);
+      const hasPlurals = [...catalog.entries.values()].some((e) => e.message.kind === "plural");
+      if (!spec && hasPlurals) {
+        issues.push({
+          severity: "warning",
+          code: "plural-forms-unknown",
+          message: `Plural rules for ${locale} are unknown, so plural forms were not checked`,
+          target: loaded.id,
+          locale,
+        });
       }
       let missing = 0;
       for (const src of loaded.source.entries.values()) {
@@ -90,10 +106,12 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
         }
         if (!src.translatable) continue;
         issues.push(
-          ...checkTranslation(adapter, src, tgt, locale, project.config.sourceLocale).map((i) => ({
-            ...where,
-            ...i,
-          })),
+          ...checkTranslation(loaded, spec, src, tgt, locale, project.config.sourceLocale).map(
+            (i) => ({
+              ...where,
+              ...i,
+            }),
+          ),
         );
       }
     }
@@ -103,17 +121,20 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
 
 type Found = Pick<Issue, "severity" | "code" | "message"> & { form?: string };
 
-function checkSource(adapter: FormatAdapter<never>, src: Entry): Found[] {
+function checkSource(target: Target, src: Entry): Found[] {
   const out: Found[] = [];
   const each = (value: string, form?: string) => {
-    const a = adapter.analyze(value, src);
+    const a = target.analyze(value, src);
     for (const l of a.lints) out.push({ ...l, ...(form ? { form } : {}) });
     const loose = a.placeholders.filter((p) => !p.positional);
     if (loose.length > 1) {
+      const printf = loose.every((p) => p.raw.startsWith("%") && p.type);
       out.push({
         severity: "warning",
         code: "placeholder-not-positional",
-        message: `Use numbered placeholders (${loose.map((p, i) => `%${i + 1}$${p.type}`).join(", ")}) so translators can reorder them`,
+        message: printf
+          ? `Use numbered placeholders (${loose.map((p, i) => `%${i + 1}$${p.type}`).join(", ")}) so translators can reorder them`
+          : `${loose.map((p) => p.raw).join(", ")} can't be reordered; name or number them so translators can`,
         ...(form ? { form } : {}),
       });
     }
@@ -123,20 +144,21 @@ function checkSource(adapter: FormatAdapter<never>, src: Entry): Found[] {
   else if (m.kind === "array") {
     for (const [i, v] of m.items.entries()) each(v, String(i));
   } else {
-    if (m.forms.other === undefined) {
+    if (m.forms.other === undefined && Object.keys(m.forms).some((k) => !/^\d+$/.test(k))) {
       out.push({
         severity: "error",
         code: "plural-missing-category",
         message: 'Plural has no "other" form',
       });
     }
-    for (const [c, v] of Object.entries(m.forms)) each(v as string, c);
+    for (const [c, v] of Object.entries(m.forms)) each(v, c);
   }
   return out;
 }
 
 function checkTranslation(
-  adapter: FormatAdapter<never>,
+  target: Target,
+  spec: PluralSpec | undefined,
   src: Entry,
   tgt: Entry,
   locale: string,
@@ -154,8 +176,9 @@ function checkTranslation(
     ];
   }
   const sameLanguage = locale.split("-")[0] === sourceLocale.split("-")[0];
+  // Both sides are read with the source entry's metadata (format flags, `formatted`).
   const compare = (sv: string, tv: string, form?: string, countImplied = false) =>
-    compareValues(adapter.analyze(sv, src), adapter.analyze(tv, tgt), {
+    compareValues(target.analyze(sv, src), target.analyze(tv, src), {
       countImplied,
       sameLanguage,
     }).map((f) => (form ? { ...f, form } : f));
@@ -180,26 +203,44 @@ function checkTranslation(
 
   if (s.kind === "plural" && t.kind === "plural") {
     const out: Found[] = [];
-    const required = pluralCategories(locale);
-    const missing = required.filter((c) => t.forms[c] === undefined);
-    if (missing.length > 0) {
-      out.push({
-        severity: "error",
-        code: "plural-missing-category",
-        message: `${locale} needs plural forms ${required.join(", ")}; missing ${missing.join(", ")}`,
-      });
-    }
-    for (const [c, tv] of Object.entries(t.forms) as Array<[PluralCategory, string]>) {
-      if (!required.includes(c)) {
+    const sourceValues = messageValues(s);
+    const singular = sourceValues[0]?.[1];
+    const pluralValue = sourceValues.at(-1)?.[1];
+    const label = (id: string) => {
+      const f = spec?.forms.find((x) => x.id === id);
+      if (!f) return id;
+      return spec?.scheme === "gettext"
+        ? `form ${id} (n = ${f.examples})`
+        : `${id} (n = ${f.examples})`;
+    };
+    if (spec) {
+      const required = spec.forms.map((f) => f.id);
+      const missing = required.filter((id) => t.forms[id] === undefined);
+      if (missing.length > 0) {
         out.push({
-          severity: "warning",
-          code: "plural-extra-category",
-          message: `${locale} never uses the "${c}" form`,
-          form: c,
+          severity: "error",
+          code: "plural-missing-category",
+          message: `${locale} needs ${required.length} plural forms (${spec.source}); missing ${missing.map(label).join(", ")}`,
         });
       }
-      const sv = s.forms[c] ?? s.forms.other;
-      if (sv !== undefined) out.push(...compare(sv, tv, c, COUNT_IMPLIED_CATEGORIES.has(c)));
+      for (const id of Object.keys(t.forms)) {
+        if (required.includes(id)) continue;
+        out.push({
+          // msgfmt rejects extra gettext forms; Android just never uses an extra category.
+          severity: spec.scheme === "gettext" ? "error" : "warning",
+          code: "plural-extra-category",
+          message:
+            spec.scheme === "gettext"
+              ? `${locale} has ${required.length} plural forms; form ${id} is one too many`
+              : `${locale} never uses the "${id}" form`,
+          form: id,
+        });
+      }
+    }
+    for (const [id, tv] of Object.entries(t.forms)) {
+      const countImplied = spec?.forms.find((f) => f.id === id)?.countImplied ?? false;
+      const sv = s.forms[id] ?? (countImplied ? singular : pluralValue);
+      if (sv !== undefined) out.push(...compare(sv, tv, id, countImplied));
     }
     return out;
   }
@@ -213,21 +254,21 @@ export function compareValues(
 ): Found[] {
   const out: Found[] = [...t.lints];
 
-  const sp = new Map(s.placeholders.map((p) => [p.index, p]));
-  const tp = new Map(t.placeholders.map((p) => [p.index, p]));
+  const sp = new Map(s.placeholders.map((p) => [p.id, p]));
+  const tp = new Map(t.placeholders.map((p) => [p.id, p]));
   for (const [i, p] of sp) {
     const other = tp.get(i);
     if (!other) {
       out.push({
         severity: opts.countImplied ? "warning" : "error",
         code: "placeholder-missing",
-        message: `Missing ${p.raw}${p.positional ? "" : ` (argument ${i})`}`,
+        message: `Missing ${p.raw}${p.positional || !/^\d+$/.test(i) ? "" : ` (argument ${i})`}`,
       });
     } else if (other.type !== p.type) {
       out.push({
         severity: "error",
         code: "placeholder-type",
-        message: `${other.raw} should be a %${p.type} like ${p.raw}`,
+        message: `${other.raw} should be ${p.raw}`,
       });
     }
   }

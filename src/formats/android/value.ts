@@ -1,4 +1,5 @@
-import type { Placeholder, ValueAnalysis } from "../../core/model.js";
+import type { ValueAnalysis } from "../../core/model.js";
+import { findPlaceholders } from "../../core/placeholders.js";
 import { decodeEntities, parseXml, XmlError, type XmlNode } from "./xml.js";
 
 type Lint = ValueAnalysis["lints"][number];
@@ -46,7 +47,7 @@ export function analyzeAndroidValue(
   }
 
   const text = resolveEscapes(flat, lints);
-  const placeholders = opts.formatted === false ? [] : findPlaceholders(text);
+  const placeholders = opts.formatted === false ? [] : findPlaceholders(text, "java");
   return { text, placeholders, tags, lints };
 }
 
@@ -161,25 +162,4 @@ function resolveEscapes(flat: string, lints: Lint[]): string {
   while (start < end && soft[start]) start++;
   while (end > start && soft[end - 1]) end--;
   return out.slice(start, end).join("");
-}
-
-const FORMAT = /%(?:(\d+)\$)?([-#+ 0,(<]*)(\d+)?(?:\.\d+)?([tT][a-zA-Z]|[a-zA-Z%])/g;
-
-/** java.util.Formatter placeholders. `%%` and `%n` are not arguments; "50% off" is prose. */
-export function findPlaceholders(text: string): Placeholder[] {
-  const found: Placeholder[] = [];
-  let ordinal = 0;
-  for (const m of text.matchAll(FORMAT)) {
-    const [raw, index, flags = "", , conv = ""] = m;
-    if (conv === "%" || conv === "n") continue;
-    if (flags.includes(" ")) continue;
-    const positional = index !== undefined;
-    found.push({
-      index: positional ? Number(index) : ++ordinal,
-      type: conv.toLowerCase(),
-      raw,
-      positional,
-    });
-  }
-  return found;
 }

@@ -2,4 +2,4 @@ sourceLocale: en
 locales: [hi, ar]
 targets:
   - format: android-xml
-    res: res
+    path: res

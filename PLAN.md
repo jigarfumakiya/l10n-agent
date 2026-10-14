@@ -297,8 +297,24 @@ memory:
     upstream issues.
 - **Pseudolocales:** Android (`en-XA`, `ar-XB`) and iOS already generate them, so there
   is no `pseudo` command. The extract skill turns on the built-in ones instead.
-- **Next:** P2 (agent loop).
-
+- **Core generalized for many formats (2026-10-14):**
+  - Pluggable placeholder syntaxes (java, c, python, python-brace, java-message, qt, ruby,
+    i18next).
+  - Two plural models: CLDR categories, and numbered gettext forms described from the
+    `Plural-Forms` formula, which has a safe parser with no `eval`.
+  - Path patterns with `{locale}`, and gettext or BCP 47 locale spelling.
+  - Native review states (`fuzzy` counts as a draft).
+  - Each format opens a target object that holds its own state.
+- **gettext PO format done:**
+  - Writes unchanged blocks verbatim and wraps changed ones exactly like `msgcat`,
+    measured in display columns.
+  - Tested on Django admin's real files in 11 languages: every file round-trips byte for
+    byte. It found a real Irish placeholder bug that `msgfmt --check` misses.
+  - 105 tests pass.
+- **Next:**
+  - `detect` and `init` (auto-detect formats, ask when unsure).
+  - Then JSON, ARB and xcstrings.
+  - Then P2 (agent loop).
 
 Every phase ends with something usable, tried out on StillMoney. The day counts are
 rough focused-work estimates.

@@ -1,7 +1,7 @@
 import { promises as fsp } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { memoryFs, nodeFs } from "../src/core/fs.js";
+import { type FileSystem, memoryFs, nodeFs } from "../src/core/fs.js";
 import { openProject } from "../src/core/project.js";
 import { androidAdapter } from "../src/formats/android/adapter.js";
 import { fixture } from "./helpers.js";
@@ -9,7 +9,7 @@ import { fixture } from "./helpers.js";
 describe("android adapter", () => {
   it("loads the source and locale folders, skipping other qualifiers", async () => {
     const p = await openProject(nodeFs, { cwd: fixture("android/sample") });
-    const t = p.targets[0]?.loaded;
+    const t = p.targets[0]?.target;
     expect([...(t?.locales.keys() ?? [])].sort()).toEqual(["ar", "hi"]);
     expect([...(t?.source.entries.keys() ?? [])]).toEqual([
       "app_name",
@@ -37,20 +37,18 @@ describe("android adapter", () => {
   it("writes a locale file back byte for byte", async () => {
     const root = fixture("android/roundtrip");
     const p = await openProject(nodeFs, { cwd: root });
-    const target = p.targets[0];
+    const target = p.targets[0]?.target;
     if (!target) throw new Error("no target");
-    const catalog = target.loaded.locales.get("ar");
+    const catalog = target.locales.get("ar");
     if (!catalog) throw new Error("no ar");
-    expect(target.loaded.source.entries.has("label[tablet]")).toBe(true);
+    expect(target.source.entries.has("label[tablet]")).toBe(true);
 
     const out = memoryFs();
-    const result = await androidAdapter.writeLocale(
-      out,
-      root,
-      target.config as never,
-      target.loaded,
-      catalog,
+    const reopened = await androidAdapter.open(
+      { format: "android-xml", path: "res" },
+      { fs: readThrough(out), root, sourceLocale: "en", id: "android" },
     );
+    const result = await reopened.writeLocale(catalog);
     const file = path.join(root, "res", "values-ar", "strings.xml");
     expect(result.files).toEqual([path.join("res", "values-ar", "strings.xml")]);
     expect(out.files.get(file)).toBe(await fsp.readFile(file, "utf8"));
@@ -59,18 +57,18 @@ describe("android adapter", () => {
   it("adds new keys in source order and keeps keys it was not given", async () => {
     const root = "/app";
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    res: res\n",
+      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/app/res/values/strings.xml":
         '<resources>\n  <string name="a">A</string>\n  <string name="b">B</string>\n  <string name="c">C</string>\n</resources>\n',
       "/app/res/values-hi/strings.xml":
         '<resources>\n  <string name="c">सी</string>\n</resources>\n',
     });
     const p = await openProject(fs, { cwd: root });
-    const t = p.targets[0];
+    const t = p.targets[0]?.target;
     if (!t) throw new Error("no target");
-    const a = t.loaded.source.entries.get("a");
+    const a = t.source.entries.get("a");
     if (!a) throw new Error("no a");
-    await androidAdapter.writeLocale(fs, root, t.config as never, t.loaded, {
+    await t.writeLocale({
       locale: "hi",
       entries: new Map([["a", { ...a, message: { kind: "text", value: "ए" } }]]),
     });
@@ -81,16 +79,21 @@ describe("android adapter", () => {
 
   it("reports malformed files and duplicate keys with lines", async () => {
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "targets:\n  - format: android-xml\n    res: res\n",
+      "/app/l10n.config.yaml": "targets:\n  - format: android-xml\n    path: res\n",
       "/app/res/values/strings.xml":
         '<resources>\n<string name="a">A</string>\n<string name="a">B</string>\n</resources>',
       "/app/res/values-hi/strings.xml":
         '<resources>\n<string name="a">Tom & Jerry</string>\n</resources>',
     });
     const p = await openProject(fs, { cwd: "/app" });
-    expect(p.targets[0]?.loaded.issues.map((i) => [i.code, i.locale, i.line])).toEqual([
+    expect(p.targets[0]?.target.issues.map((i) => [i.code, i.locale, i.line])).toEqual([
       ["duplicate-key", "en", 3],
       ["xml-malformed", "hi", 2],
     ]);
   });
 });
+
+/** Reads from disk, writes to memory. */
+function readThrough(mem: FileSystem): FileSystem {
+  return { ...nodeFs, writeFile: (f, c) => mem.writeFile(f, c) };
+}

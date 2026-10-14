@@ -1,33 +1,41 @@
 import type { FileSystem } from "../core/fs.js";
-import type { Catalog, Entry, Issue, ValueAnalysis } from "../core/model.js";
+import type { Catalog, Entry, Issue, PluralSpec, ValueAnalysis } from "../core/model.js";
 
-/** A target after loading: the source catalog and every locale found on disk. */
-export interface LoadedTarget {
+export interface OpenContext {
+  fs: FileSystem;
+  /** Directory the config's paths are relative to. */
+  root: string;
+  sourceLocale: string;
+  /** Target id from the config, unique within the project. */
   id: string;
-  format: string;
-  /** Human label, e.g. the resource directory. */
-  label: string;
-  source: Catalog;
-  locales: Map<string, Catalog>;
-  /** File-level problems: parse errors, duplicate keys. */
-  issues: Issue[];
+}
+
+/**
+ * A target after loading: the source catalog, every locale found on disk, and the
+ * format-specific operations checks and writers need.
+ */
+export interface Target {
+  readonly id: string;
+  readonly format: string;
+  /** Human label, e.g. the resource directory or path pattern. */
+  readonly label: string;
+  readonly source: Catalog;
+  readonly locales: Map<string, Catalog>;
+  /** File-level problems: parse errors, duplicate keys, broken headers. */
+  readonly issues: Issue[];
+  /** Resolves a raw value so generic checks can compare source and translation. */
+  analyze(value: string, entry: Entry): ValueAnalysis;
+  /** Plural forms this locale needs in this format; undefined when it can't be known. */
+  pluralSpec(locale: string): PluralSpec | undefined;
+  /** Writes one locale. Entries absent from `catalog` are left as they are on disk. */
+  writeLocale(catalog: Catalog): Promise<WriteResult>;
 }
 
 export interface WriteResult {
   files: string[];
 }
 
-export interface FormatAdapter<TTarget = unknown> {
+export interface FormatAdapter<TConfig> {
   readonly format: string;
-  load(fs: FileSystem, root: string, target: TTarget, sourceLocale: string): Promise<LoadedTarget>;
-  /** Resolves a raw value so generic checks can compare source and translation. */
-  analyze(value: string, entry: Entry): ValueAnalysis;
-  /** Writes one locale. Entries absent from `catalog` are left as they are on disk. */
-  writeLocale(
-    fs: FileSystem,
-    root: string,
-    target: TTarget,
-    loaded: LoadedTarget,
-    catalog: Catalog,
-  ): Promise<WriteResult>;
+  open(config: TConfig, ctx: OpenContext): Promise<Target>;
 }

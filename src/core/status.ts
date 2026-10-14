@@ -26,7 +26,8 @@ export function entryState(
   lock: LockEntry | undefined,
 ): EntryState {
   if (!target) return "missing";
-  if (!lock) return "untracked";
+  // A translation the format itself marks unreviewed (gettext fuzzy) is a draft.
+  if (!lock) return target.needsReview ? "draft" : "untracked";
   if (lock.source !== hashMessage(source.message)) return "stale";
   if (lock.target !== hashMessage(target.message)) return "edited";
   return lock.state;
@@ -42,7 +43,7 @@ export interface LocaleStatus {
 
 export function computeStatus(project: Project, locales = projectLocales(project)): LocaleStatus[] {
   const out: LocaleStatus[] = [];
-  for (const { loaded } of project.targets) {
+  for (const { target: loaded } of project.targets) {
     const sources = [...loaded.source.entries.values()].filter((e) => e.translatable);
     for (const locale of locales) {
       const catalog = loaded.locales.get(locale);

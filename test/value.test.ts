@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { analyzeAndroidValue, findPlaceholders } from "../src/formats/android/value.js";
+import { findPlaceholders } from "../src/core/placeholders.js";
+import { analyzeAndroidValue } from "../src/formats/android/value.js";
 
 const codes = (raw: string) => analyzeAndroidValue(raw).lints.map((l) => l.code);
 
@@ -44,18 +45,20 @@ describe("analyzeAndroidValue", () => {
 
 describe("findPlaceholders", () => {
   it("numbers positional and ordinal arguments", () => {
-    expect(findPlaceholders("%2$d of %1$s").map((p) => [p.index, p.type])).toEqual([
-      [2, "d"],
-      [1, "s"],
+    expect(findPlaceholders("%2$d of %1$s", "java").map((p) => [p.id, p.type])).toEqual([
+      ["2", "d"],
+      ["1", "s"],
     ]);
-    expect(findPlaceholders("%s spent %.2f").map((p) => [p.index, p.type, p.positional])).toEqual([
-      [1, "s", false],
-      [2, "f", false],
+    expect(
+      findPlaceholders("%s spent %.2f", "java").map((p) => [p.id, p.type, p.positional]),
+    ).toEqual([
+      ["1", "s", false],
+      ["2", "f", false],
     ]);
   });
 
   it("ignores %%, %n and prose like 50% off", () => {
-    expect(findPlaceholders("100%% sure%n 50% off")).toEqual([]);
+    expect(findPlaceholders("100%% sure%n 50% off", "java")).toEqual([]);
   });
 });
 

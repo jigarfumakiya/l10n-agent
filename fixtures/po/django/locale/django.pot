@@ -1,0 +1,60 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: sample 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-14 12:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: app/views.py:12
+msgid "Safe to spend today"
+msgstr ""
+
+#: app/views.py:20
+#, python-format
+msgid "Hi %(name)s, you have %(count)d new alerts"
+msgstr ""
+
+#: app/templates/home.html:8
+msgctxt "button"
+msgid "Save"
+msgstr ""
+
+#: app/templates/goals.html:3
+msgid "Save"
+msgstr ""
+
+#: app/views.py:31
+#, python-format
+msgid "%(count)d day left"
+msgid_plural "%(count)d days left"
+msgstr[0] ""
+msgstr[1] ""
+
+#: app/views.py:40
+#, python-brace-format
+msgid "Spent {amount} of {budget}"
+msgstr ""
+
+#. Translators: shown on the paywall, keep it short.
+#: app/templates/paywall.html:5
+msgid "Unlock Pro"
+msgstr ""
+
+#: app/templates/home.html:40
+msgid ""
+"Your safe-to-spend amount updates every time you log an expense, so you "
+"always know what is left for today."
+msgstr ""

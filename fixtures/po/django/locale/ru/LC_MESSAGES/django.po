@@ -1,0 +1,12 @@
+msgid ""
+msgstr ""
+"Language: ru\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: app/views.py:31
+#, python-format
+msgid "%(count)d day left"
+msgid_plural "%(count)d days left"
+msgstr[0] "Остался %(count)d день"
+msgstr[1] "Осталось %(count)d дней"

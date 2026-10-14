@@ -1,4 +1,4 @@
 locales: [ar]
 targets:
   - format: android-xml
-    res: res
+    path: res

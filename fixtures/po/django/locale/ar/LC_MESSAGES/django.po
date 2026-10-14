@@ -1,0 +1,29 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: sample 1.0\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 "
+"&& n%100<=10 ? 3 : n%100>=11 ? 4 : 5);\n"
+
+#: app/views.py:12
+msgid "Safe to spend today"
+msgstr "آمن للإنفاق اليوم"
+
+#: app/views.py:20
+#, python-format
+msgid "Hi %(name)s, you have %(count)d new alerts"
+msgstr "مرحبًا %(nme)s، لديك %(count)d تنبيهات جديدة"
+
+#: app/views.py:31
+#, python-format
+msgid "%(count)d day left"
+msgid_plural "%(count)d days left"
+msgstr[0] "لم يتبق أي يوم"
+msgstr[1] "بقي يوم واحد"
+msgstr[2] "بقي يومان"
+msgstr[3] "بقيت %(count)d أيام"
+msgstr[4] "بقي %(count)d يومًا"
+msgstr[5] "بقي %(count)d يوم"

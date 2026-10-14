@@ -33,7 +33,7 @@ describe("status", () => {
       },
     };
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    res: res\n",
+      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/app/.l10n/lock.json": JSON.stringify(lock),
       "/app/res/values/strings.xml":
         '<resources><string name="ok">OK</string><string name="changed">New</string><string name="edited">Edit</string><string name="hand">Hand</string><string name="todo">Todo</string><string name="fixed" translatable="false">X</string></resources>',

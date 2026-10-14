@@ -1,0 +1,5 @@
+locales: [hi, ar, ru]
+targets:
+  - format: po
+    path: locale/{locale}/LC_MESSAGES/django.po
+    template: locale/django.pot

@@ -1,4 +1,4 @@
-import type { Issue } from "../core/model.js";
+import { displayKey, type Issue } from "../core/model.js";
 import type { Project } from "../core/project.js";
 import { ENTRY_STATES, type LocaleStatus } from "../core/status.js";
 
@@ -23,10 +23,10 @@ function table(rows: string[][]): string {
 
 export function printStatus(project: Project, status: LocaleStatus[]): void {
   for (const t of project.targets) {
-    const rows = status.filter((s) => s.target === t.loaded.id);
+    const rows = status.filter((s) => s.target === t.target.id);
     const total =
-      rows[0]?.total ?? [...t.loaded.source.entries.values()].filter((e) => e.translatable).length;
-    console.log(bold(`${t.loaded.id}`) + dim(` · ${t.loaded.label} · ${total} source strings`));
+      rows[0]?.total ?? [...t.target.source.entries.values()].filter((e) => e.translatable).length;
+    console.log(bold(`${t.target.id}`) + dim(` · ${t.target.label} · ${total} source strings`));
     if (rows.length === 0) {
       console.log(dim("  No target locales. Add `locales:` to the config.\n"));
       continue;
@@ -57,9 +57,8 @@ export function printIssues(issues: Issue[]): void {
   const infos = issues.filter((i) => i.severity === "info");
   for (const i of shown) {
     const mark = i.severity === "error" ? red("✖") : yellow("▲");
-    const where = [i.locale, i.key && (i.form ? `${i.key}[${i.form}]` : i.key)]
-      .filter(Boolean)
-      .join(" ");
+    const key = i.key === undefined ? undefined : truncate(displayKey(i.key), 48);
+    const where = [i.locale, key && (i.form ? `${key}[${i.form}]` : key)].filter(Boolean).join(" ");
     const loc = i.file ? dim(` ${i.file}${i.line ? `:${i.line}` : ""}`) : "";
     console.log(`${mark} ${bold(where)} ${dim(i.code)} ${i.message}${loc}`);
   }
@@ -69,4 +68,9 @@ export function printIssues(issues: Issue[]): void {
   const warnings = shown.length - errors;
   const summary = `${errors} error${errors === 1 ? "" : "s"}, ${warnings} warning${warnings === 1 ? "" : "s"}`;
   console.log(errors > 0 ? red(summary) : warnings > 0 ? yellow(summary) : green(`✔ ${summary}`));
+}
+
+function truncate(s: string, max: number): string {
+  const one = s.replace(/\s+/g, " ");
+  return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 }
