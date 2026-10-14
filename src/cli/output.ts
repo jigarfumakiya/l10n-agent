@@ -230,6 +230,7 @@ export function printPlan(p: Plan): void {
       `Languages: ${p.locales.map((l) => `${l.name} (${l.code}${l.isNew ? ", new" : ""})`).join(", ")} · ${count}`,
     );
   }
+  for (const w of p.warnings) console.log(`${yellow("▲")} ${w}`);
   for (const b of p.blockers) console.log(`${yellow("▲")} ${b.message}`);
   console.log();
   console.log(bold("Plan"));

@@ -4,6 +4,7 @@ import type { FileSystem } from "../core/fs.js";
 import { LOCALE_TOKEN, parseLocaleSegment } from "../core/paths.js";
 import { openTarget } from "../core/project.js";
 import { estimateHardcoded, type HardcodedText, literalsForResDir } from "./hardcoded.js";
+import { findOtherSystems, type OtherSystem } from "./others.js";
 import { walk } from "./walk.js";
 
 export type Confidence = "high" | "medium" | "low";
@@ -44,6 +45,8 @@ export interface DetectResult {
   hints: string[];
   /** Estimated user-facing text still hardcoded in code, per platform. */
   hardcoded: HardcodedText[];
+  /** Other localization tools already in use (platforms, runtime SDKs, libraries). */
+  otherSystems: OtherSystem[];
   truncated: boolean;
 }
 
@@ -57,6 +60,7 @@ export async function detect(fs: FileSystem, root: string): Promise<DetectResult
     ...(await detectXcstrings(fs, root, files)),
   ];
   const hardcoded = await estimateHardcoded(fs, root, files);
+  const otherSystems = await findOtherSystems(fs, root, files);
   flagHardcoded(found, hardcoded);
   const candidates = found.sort(
     (a, b) => RANK[a.confidence] - RANK[b.confidence] || b.strings - a.strings,
@@ -86,8 +90,12 @@ export async function detect(fs: FileSystem, root: string): Promise<DetectResult
     unsupported,
     sourceLocale,
     locales,
-    hints: hints(files, candidates, unsupported, hardcoded),
+    hints: [
+      ...otherSystems.map((o) => o.message),
+      ...hints(files, candidates, unsupported, hardcoded),
+    ],
     hardcoded,
+    otherSystems,
     truncated,
   };
 }

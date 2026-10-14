@@ -21,6 +21,8 @@ Call `localship_plan` with the languages from the request, as names or codes
 (`["Hindi"]`, `["hi", "ar"]`). Then reply with a short message, at most about 10 lines:
 
 - **What I found:** the files, how many strings, and anything in the way (the plan's `blockers`).
+  If the plan has `warnings` (another tool, like Crowdin or an over-the-air SDK, already manages
+  translations), say so plainly and ask whether to go ahead anyway.
 - **What I'll do:** the plan's `steps`, briefly.
 - **Defaults:** voice per language and names kept as written (the plan's `defaults`). Say
   they can change any of them in their reply.

@@ -4,6 +4,8 @@ import { runInit } from "../cli/init-command.js";
 import { type DetectResult, detect, mostlyHardcoded } from "../detect/detect.js";
 import { hardcodedNotes } from "../detect/hardcoded.js";
 import { defaultSelection } from "../detect/init.js";
+import { findOtherSystems } from "../detect/others.js";
+import { walk } from "../detect/walk.js";
 import { addLocales, CONFIG_FILE, loadConfig } from "./config.js";
 import { CONTEXT_FILES } from "./context.js";
 import { UserError } from "./errors.js";
@@ -27,6 +29,8 @@ export interface Plan {
   targets: Array<{ format: string; path: string; strings: number }>;
   /** Strings to translate (missing or stale), per locale. */
   work: Record<string, number>;
+  /** Worth knowing before starting, but not in the way (another tool managing translations…). */
+  warnings: string[];
   /** Things to fix first, each with what the agent will do about it. */
   blockers: Array<{ kind: Blocker; message: string; fix: string }>;
   /** Choices made for the user, which they can change in their reply. */
@@ -203,6 +207,7 @@ async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promis
   );
   const keep = await appNames(fs, path.resolve(cwd), result);
   return build({
+    warnings: result.otherSystems.map((o) => o.message),
     configured: false,
     sourceLocale: result.sourceLocale.value,
     locales: locales.map((code) => ({ code, name: languageName(code), isNew: true })),
@@ -250,7 +255,10 @@ async function planConfigured(project: Project, requested: string[]): Promise<Pl
       fix: "Tell me which languages to translate into.",
     });
   }
+  const { files } = await walk(project.fs, project.root);
+  const others = await findOtherSystems(project.fs, project.root, files);
   return build({
+    warnings: others.map((o) => o.message),
     configured: true,
     sourceLocale: project.config.sourceLocale,
     locales: focus.map((code) => ({
@@ -272,6 +280,7 @@ async function planConfigured(project: Project, requested: string[]): Promise<Pl
 }
 
 function build(p: {
+  warnings: string[];
   configured: boolean;
   sourceLocale: string;
   locales: Plan["locales"];
@@ -324,6 +333,7 @@ function build(p: {
     locales: p.locales,
     targets: p.targets,
     work: p.work,
+    warnings: p.warnings,
     blockers: p.blockers,
     defaults: {
       voice,
