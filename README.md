@@ -3,7 +3,7 @@
 # 🌍 Localship
 
 **Translate your app with the AI you already use.**
-Free, private, and checked so nothing breaks.
+Free, local-first, and every translation is checked before it's written.
 
 [![CI](https://github.com/jigarfumakiya/localship/actions/workflows/ci.yml/badge.svg)](https://github.com/jigarfumakiya/localship/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -11,7 +11,7 @@ Free, private, and checked so nothing breaks.
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Quick start](#-quick-start) · [Formats](#-formats) · [Why it's different](#-why-its-different) · [AI tools](#-works-with-your-ai-tools) · [Reference](docs/reference.md)
+[Quick start](#-quick-start) · [Formats](#-formats) · [When to use it](#-when-to-use-it) · [AI tools](#-works-with-your-ai-tools) · [Reference](docs/reference.md)
 
 </div>
 
@@ -23,27 +23,35 @@ everything in your repo.
 
 ```
 You:    Set up localization for this app.
-Agent:  Found 312 strings in app/src/main/res. Which languages do you want?
+Agent:  Found 18 strings in app/src/main/res. Which languages do you want?
 You:    Hindi and Arabic.
-Agent:  Done. I drafted a short brief and glossary from your README. Have a look.
+Agent:  Before translating, I drafted a short brief, voice notes and a glossary. Have a look.
 You:    Translate the app.
-Agent:  624 translations written as drafts, all checks passed.
-        Arabic uses all six plural forms; "StillMoney" was kept as written everywhere.
+Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural forms,
+        and "Jotter Pro" was kept as written.
 ```
+
+<sub>From the example app in [examples/android-notes](examples/android-notes).</sub>
+
+> [!NOTE]
+> **Early days.** Localship is tested on real-world files (AndroidX resources, Django's
+> translations, open-source String Catalogs) and a small example app, but it hasn't been used to
+> ship a production app yet. Expect rough edges, and please [open an issue](https://github.com/jigarfumakiya/localship/issues) when you hit one.
 
 ## ✨ Highlights
 
-- 🛡️ **Nothing breaks.** Placeholders, plural forms, escaping and markup are checked in code before
-  anything is written. Bad translations go back to the AI to fix.
-- 🧠 **Translations that fit.** The AI sees the code that shows each string, its comment, your
-  glossary, your brand voice, and your other platform's translations.
+- 🛡️ **Catches broken translations.** Missing or mismatched placeholders, missing plural forms,
+  Android escaping and markup are checked in code before anything is written. Translations that
+  fail go back to the AI with the reason.
+- 🧠 **More context for the AI.** Each string comes with the code that uses it, its comment, your
+  glossary and voice notes, and translations of the same text elsewhere in your project.
 - 🔒 **Your files stay yours.** No server, no account, no upload. Translations go into the files your
   app already uses, formatted the way Android Studio and Xcode write them.
 - 🤖 **Any model.** Your coding agent's own model, or Claude, GPT, Gemini, OpenRouter, or a local
   model through Ollama.
 - 💸 **Free.** MIT-licensed. You pay only for your own AI tokens, or nothing with a local model.
 - ✋ **People stay in charge.** Translations land as drafts for review. Hand edits and approved
-  translations are never overwritten.
+  translations are never overwritten unless you ask.
 - 💻 **Runs anywhere.** macOS, Linux and Windows. As an MCP server, agent skills, or a CLI.
 
 ## 📦 Formats
@@ -61,18 +69,23 @@ Agent:  624 translations written as drafts, all checks passed.
 Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
 all supported. String Catalog substitutions and device variations come next.
 
-## 🆚 Why it's different
+## 🤔 When to use it
 
-| | Cloud localization platforms | Pasting strings into a chatbot | **Localship** |
-|---|:---:|:---:|:---:|
-| Translations stay in your repo | ❌ Synced to their servers | ✅ | ✅ |
-| Price | 💸 Per seat or per word | Your AI plan | **Free** + your AI plan |
-| Placeholders and plurals checked before saving | ⚠️ Varies | ❌ | ✅ |
-| Context for each string | ⚠️ Screenshots you upload | ❌ | ✅ Read from your code |
-| Brand voice and glossary | ✅ | ⚠️ If you paste them each time | ✅ Files in your repo |
-| Works with your own AI agent | ⚠️ Some, through their API | ✅ | ✅ |
-| Keeps hand edits safe | ✅ | ❌ | ✅ |
-| Native file formatting, small diffs | ⚠️ Varies | ❌ | ✅ |
+Your coding agent can already translate a `strings.xml` file if you ask. Localship is for when
+that stops being enough:
+
+- **You localize continuously.** It tracks what's new, what changed since it was translated and
+  what someone edited by hand, so each run only does the work that's needed.
+- **You have plurals and placeholders.** Models regularly drop a `%1$s`, miss Arabic or Russian
+  plural forms, or leave an Android apostrophe unescaped. These are caught before they reach your
+  files, not at build time or in production.
+- **You want consistency.** A glossary, voice notes and earlier translations keep terms and tone
+  the same across hundreds of strings and both platforms.
+- **You don't want a cloud platform.** Everything stays in your repo, with any model you like.
+
+If you just need a handful of strings translated once, asking your agent directly is fine.
+
+What the checks can't do is judge meaning or tone. That's what review is for.
 
 ## 🚀 Quick start
 
@@ -108,7 +121,7 @@ When you're happy, say "approve them" and build your app as usual. 🎉
 |---|---|
 | 🌐 **Already has some translations** | "Set up localization." Existing translations are kept and checked for real bugs, and you decide whether to trust or review them |
 | 📝 **Has strings, no translations yet** | "Translate the app into French and German." |
-| 🧱 **Text is written straight into the code** | "Make this app localizable." The agent moves the text into `strings.xml` or a String Catalog without changing what the app does |
+| 🧱 **Text is written straight into the code** | "Make this app localizable." The agent follows a step-by-step guide to move the text into `strings.xml` or a String Catalog. Tools that find and check this for you are still to come |
 | ➕ **Adding a language later** | "Add Japanese." |
 | ✏️ **You changed some copy** | "Update the translations." Only changed strings are redone, and the AI sees what changed |
 | 🌿 **New strings in a feature branch** | "Translate the new strings." |
@@ -199,16 +212,19 @@ Japanese one, automatically.
 <details>
 <summary><b>How good are the translations?</b></summary>
 
-As good as the model and the context. The brief, voice and glossary make the biggest difference;
-the checks make sure nothing breaks your app. See a real result in
+As good as the model and the context you give it. The brief, voice and glossary make the biggest
+difference. The checks catch mechanical errors (placeholders, plural forms, escaping), not wrong
+meaning, so review the drafts, ideally with a native speaker. See a real result in
 [examples/android-notes](examples/android-notes).
 </details>
 
 <details>
 <summary><b>Is it ready?</b></summary>
 
-It's young but working: setup, translation, checks, review and cleanup work for the three supported
-formats, on macOS, Linux and Windows. See the [plan](PLAN.md) for what's next.
+Not for production yet. Setup, translation, checks, review and cleanup work for the three supported
+formats on macOS, Linux and Windows, with about 190 automated tests and real-world sample files.
+It hasn't been used to ship a real app yet, and translating through a model API hasn't been tried
+against a live provider. See the [plan](PLAN.md) for what's next.
 </details>
 
 ## 🛣️ Roadmap
