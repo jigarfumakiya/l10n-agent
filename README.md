@@ -98,16 +98,15 @@ What the checks can't do is judge meaning or tone. That's what review is for.
 
 Using Cursor, Codex, VS Code or another tool? See [Works with your AI tools](#-works-with-your-ai-tools).
 
-**2. Set up.** Open your app's repo and ask:
+**2. Ask.** Open your app's repo and say what you want:
 
-> 💬 Set up localization for this app.
+> 💬 Translate this app into Hindi and Arabic.
 
-The agent finds your translation files, asks which languages you want, and drafts a short brief,
-voice guide and glossary for you to check.
+You get one short plan: what it found, what it will do, and the defaults it picked (like
+formality per language, and your app's name kept as written). Change anything in your reply.
 
-**3. Translate.**
-
-> 💬 Translate the app into Hindi and Arabic.
+**3. Say "start translating".** It sets everything up, writes a short brief, translates every
+string, checks each one, and reports back. No more questions unless something is truly blocked.
 
 **4. Review and ship.**
 
@@ -165,9 +164,9 @@ Everything also works from the terminal, which is handy for big apps and CI:
 ```sh
 npm install -g github:jigarfumakiya/localship
 
-localship init                                            # find your files, pick languages
-localship translate --model anthropic:claude-sonnet-5-5   # or openai:…, gemini:…, ollama:…
-localship validate                                        # exits 1 on errors: use it in CI
+localship plan hindi arabic                                   # what it takes, before changing anything
+localship start hi,ar --model anthropic:claude-sonnet-5-5     # set up and translate in one go
+localship validate                                            # exits 1 on errors: use it in CI
 localship approve
 ```
 

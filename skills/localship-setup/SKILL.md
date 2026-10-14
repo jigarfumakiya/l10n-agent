@@ -9,6 +9,9 @@ Localship keeps translations in the repo's own files (Android `res/values-*/stri
 gettext `.po`, Apple `.xcstrings`) and checks every translation in code. You do the parts
 that need judgment: choosing what to set up, and writing the context translators use.
 
+> For a direct request ("translate this app to Hindi"), start with the `localship` skill: it
+> plans once, asks for one confirmation, and then uses this playbook without more questions.
+
 ## Running the tool
 
 - If `localship_*` MCP tools are available, use them (`localship_detect`, `localship_init`, …).

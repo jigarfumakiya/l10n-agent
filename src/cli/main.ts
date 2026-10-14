@@ -4,6 +4,7 @@ import { Command, InvalidArgumentError } from "commander";
 import { addLocales, loadConfig } from "../core/config.js";
 import { UserError } from "../core/errors.js";
 import { nodeFs } from "../core/fs.js";
+import { plan, start } from "../core/plan.js";
 import { openProject } from "../core/project.js";
 import { computeStatus, ENTRY_STATES, type EntryState } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
@@ -24,6 +25,7 @@ import {
   describeNone,
   printApprove,
   printIssues,
+  printPlan,
   printStatus,
   printSubmit,
 } from "./output.js";
@@ -120,6 +122,70 @@ program
       for (const line of describeDetect(result)) console.log(line);
       console.log("\nNext: `localship init` writes these into localship.yaml.");
     }
+  });
+
+program
+  .command("plan")
+  .description("What it takes to translate this app: findings, blockers, steps and defaults")
+  .argument("[languages...]", "languages to translate into, as codes or names (hi, Hindi, pt-BR)")
+  .option("--json", "machine-readable output")
+  .action(async (languages: string[], opts: { json?: boolean }) => {
+    const p = await plan(nodeFs, globals().cwd, {
+      locales: languages.flatMap((l) => l.split(",")).filter(Boolean),
+    });
+    if (opts.json) console.log(JSON.stringify(p, null, 2));
+    else printPlan(p);
+  });
+
+program
+  .command("start")
+  .description(
+    "Set up and translate in one go: config, default context, then translation with --model",
+  )
+  .argument("<languages...>", "languages to translate into, as codes or names")
+  .option(
+    "-m, --model <provider:model>",
+    "translate with this model right away (default: models in the config)",
+  )
+  .option("--json", "machine-readable output")
+  .action(async (languages: string[], opts: { model?: string; json?: boolean }) => {
+    const g = globals();
+    const locales = languages.flatMap((l) => l.split(",")).filter(Boolean);
+    const setup = await start(nodeFs, g.cwd, { locales });
+    const project = await openProject(nodeFs, g);
+    const canTranslate = !!(opts.model ?? project.config.models?.default);
+    const translated =
+      canTranslate && setup.warnings.length === 0
+        ? await translateProject(project, {
+            locales: setup.addedLocales.length ? setup.addedLocales : undefined,
+            model: opts.model,
+            log: (line) => console.error(line),
+          })
+        : undefined;
+    if (opts.json) {
+      console.log(JSON.stringify({ setup, translated }, null, 2));
+      return;
+    }
+    console.log(setup.createdConfig ? `Set up ${setup.config}.` : `Using ${setup.config}.`);
+    if (setup.addedLocales.length) console.log(`Languages added: ${setup.addedLocales.join(", ")}`);
+    if (setup.wrote.length)
+      console.log(`Context written: ${setup.wrote.join(", ")} (edit them any time)`);
+    for (const w of setup.warnings) console.log(`▲ ${w}`);
+    if (setup.warnings.length) {
+      console.log(
+        "Next: move the text into resources (the localship-extract skill), then translate.",
+      );
+    } else if (translated) {
+      console.log(`${translated.translated} strings translated as drafts.`);
+      for (const f of translated.failed)
+        console.log(`  ✖ ${f.locale} ${f.key}: ${f.errors.join("; ")}`);
+      console.log("Next: review the drafts, then `localship approve`.");
+    } else {
+      console.log(
+        'Next: ask your agent to "translate the app", or run `localship start … --model anthropic:claude-sonnet-5-5` to translate here.',
+      );
+    }
+    process.exitCode = translated && translated.failed.length > 0 ? 1 : 0;
   });
 
 program

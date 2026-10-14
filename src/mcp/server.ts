@@ -9,6 +9,7 @@ import { addLocales, loadConfig } from "../core/config.js";
 import { CONTEXT_FILES, writeContext } from "../core/context.js";
 import { UserError } from "../core/errors.js";
 import { type FileSystem, nodeFs } from "../core/fs.js";
+import { plan, start } from "../core/plan.js";
 import { openProject } from "../core/project.js";
 import { computeStatus, ENTRY_STATES } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
@@ -48,7 +49,7 @@ export function createServer(opts: ServerOptions): McpServer {
     { name: "localship", version: opts.version },
     {
       instructions:
-        "Localization for app projects (Android XML, gettext PO, Apple String Catalogs). Start with localship_status; if there's no config, localship_detect then localship_init. Translate with localship_next_batch → localship_submit until nothing remains, then localship_validate. Never edit translation files by hand when these tools can do it.",
+        "Localization for app projects (Android XML, gettext PO, Apple String Catalogs). For any direct request (translate the app, add a language, update translations), call localship_plan first, show the user its short plan ending with the confirm phrase, and once they say it, follow the plan's steps without more questions: localship_start, then localship_next_batch → localship_submit until nothing remains, then localship_validate. For status questions use localship_status, or localship_detect when there's no config. Never edit translation files by hand when these tools can do it.",
     },
   );
   const dir = (cwd?: string) => path.resolve(opts.cwd, cwd ?? ".");
@@ -77,8 +78,40 @@ export function createServer(opts: ServerOptions): McpServer {
     );
 
   tool(
+    "localship_plan",
+    'Call this first for any direct request: "translate this app to Hindi", "add French", "update the translations". It looks at the project and returns a ready plan: what it found, blockers with their fix, how many strings, the defaults it chose (voice per language, names kept as written), the steps, and the confirm phrase. Show the user a short version (what it found, the steps, the defaults they can change) and end with: Say "<confirm>" to go. Once they say it, follow the steps in order without asking more questions. If confirm is empty, explain the blocker instead.',
+    {
+      cwd: cwdArg,
+      locales: z
+        .array(z.string())
+        .optional()
+        .describe("Languages the user asked for, as codes or names (hi, Hindi, pt-BR)"),
+    },
+    async ({ cwd, locales }) => plan(fs, dir(cwd), { locales }),
+    { readOnlyHint: true },
+  );
+
+  tool(
+    "localship_start",
+    "Do the setup step of a confirmed plan in one call: creates localship.yaml (or adds the languages to it), and writes default voice notes and a glossary of names to keep, without overwriting existing ones. Then draft the brief if there is none, and translate.",
+    {
+      cwd: cwdArg,
+      locales: z.array(z.string()).min(1).describe("Languages, as codes or names"),
+      voice: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe("Voice per locale, if the user changed the plan's defaults"),
+      keepAsWritten: z
+        .array(z.string())
+        .optional()
+        .describe("Names to keep as written, if the user changed the plan's list"),
+    },
+    async ({ cwd, ...o }) => start(fs, dir(cwd), o),
+  );
+
+  tool(
     "localship_status",
-    "Translation progress per target and locale: how many strings are missing, stale, drafts, approved… Call this first.",
+    "Translation progress per target and locale: how many strings are missing, stale, drafts, approved…, and how much UI text is still in the code. Use for status questions; for requests to translate or add languages, use localship_plan.",
     { cwd: cwdArg, locales: localesArg },
     async ({ cwd, locales }) => {
       const p = await project(cwd);
@@ -292,6 +325,7 @@ ${TRANSLATION_RULES}`,
   );
 
   for (const name of [
+    "localship",
     "localship-setup",
     "localship-extract",
     "localship-translate",

@@ -1,4 +1,5 @@
 import { displayKey, type Issue } from "../core/model.js";
+import type { Plan } from "../core/plan.js";
 import type { Project } from "../core/project.js";
 import { ENTRY_STATES, type LocaleStatus } from "../core/status.js";
 import type { ApproveResult, SubmitResult } from "../core/workflow.js";
@@ -208,4 +209,48 @@ export function printApprove(r: ApproveResult, to: string): void {
   const each = [...counts].map(([l, n]) => `${l} ${n}`).join(", ");
   console.log(`${r.dryRun ? "Would mark" : "Marked"} ${r.changed.length} ${to} (${each})`);
   for (const f of r.files) console.log(dim(`  ${f}`));
+}
+
+export function printPlan(p: Plan): void {
+  const where =
+    p.targets.map((t) => `${t.path} (${t.strings} strings)`).join(", ") ||
+    "no translation files yet";
+  console.log(
+    bold(p.configured ? "Localship is set up" : "Localship isn't set up yet") + dim(` · ${where}`),
+  );
+  if (p.locales.length) {
+    const per = Math.max(0, ...Object.values(p.work));
+    const total = Object.values(p.work).reduce((a, b) => a + b, 0);
+    const about = p.ready ? "" : "about ";
+    const count =
+      p.locales.length > 1
+        ? `${about}${per} strings, ${total} translations`
+        : `${about}${per} strings`;
+    console.log(
+      `Languages: ${p.locales.map((l) => `${l.name} (${l.code}${l.isNew ? ", new" : ""})`).join(", ")} · ${count}`,
+    );
+  }
+  for (const b of p.blockers) console.log(`${yellow("▲")} ${b.message}`);
+  console.log();
+  console.log(bold("Plan"));
+  for (const [i, s] of p.steps.entries()) console.log(`  ${i + 1}. ${s}`);
+  if (p.locales.length || p.defaults.keepAsWritten.length) {
+    console.log();
+    console.log(bold("Defaults") + dim(" (change any of them before starting)"));
+    for (const [l, v] of Object.entries(p.defaults.voice)) console.log(`  ${l}: ${v}`);
+    if (p.defaults.keepAsWritten.length) {
+      console.log(`  Kept as written: ${p.defaults.keepAsWritten.join(", ")}`);
+    }
+  }
+  console.log();
+  const codes = p.locales.map((l) => l.code).join(",");
+  console.log(
+    !p.confirm
+      ? yellow("Sort out the item above first.")
+      : p.ready
+        ? green(
+            `Ready. Tell your agent "${p.confirm}", or run \`localship start ${codes} --model …\` to translate here.`,
+          )
+        : green(`Tell your agent "${p.confirm}" to begin with step 1 (that step needs an agent).`),
+  );
 }

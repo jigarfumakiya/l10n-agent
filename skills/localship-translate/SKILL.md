@@ -9,6 +9,9 @@ The tool picks the strings, gives you the context, checks every translation in c
 (placeholders, plural forms, escaping, markup, glossary) and writes the good ones as drafts.
 You translate. Don't edit translation files by hand.
 
+> For a direct request ("translate this app to Hindi"), start with the `localship` skill: it
+> plans once, asks for one confirmation, and then uses this playbook without more questions.
+
 ## Running the tool
 
 - If `localship_*` MCP tools are available, use them: `localship_next_batch`, `localship_submit`, …

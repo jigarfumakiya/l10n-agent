@@ -16,6 +16,8 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 
 | Command | What it does |
 |---|---|
+| `localship plan [languages…]` | One plan for a request: what it found, blockers and their fix, strings to translate, defaults (voice per language, names kept), steps. Writes nothing. Languages can be names (`hindi`) or codes |
+| `localship start <languages…>` | Does the setup in one go: config (or adds the languages), default voice notes and glossary, never overwriting yours. With `--model` (or `models.default` in the config) it translates right away |
 | `localship detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
 | `localship init` | Detects, asks, and writes `localship.yaml` |
 | `localship status` | Progress per target and locale |
@@ -51,10 +53,10 @@ Options:
 
 ## MCP tools
 
-`localship_status`, `localship_validate`, `localship_detect`, `localship_init`, `localship_add_locales`, `localship_get_context`,
+`localship_plan`, `localship_start`, `localship_status`, `localship_validate`, `localship_detect`, `localship_init`, `localship_add_locales`, `localship_get_context`,
 `localship_update_context`, `localship_next_batch`, `localship_submit`, `localship_approve`, `localship_remove`, `localship_prune`,
 `localship_translate`.
-The skills are also served as MCP prompts (`localship-setup`, `localship-extract`, `localship-translate`, `localship-review`) for
+The skills are also served as MCP prompts (`localship`, `localship-setup`, `localship-extract`, `localship-translate`, `localship-review`) for
 clients that don't read skills. Every tool takes an optional `cwd`. Without one, the server works in the project Claude Code
 names in `CLAUDE_PROJECT_DIR`, else the directory it was started in (or `-C <dir>`).
 
