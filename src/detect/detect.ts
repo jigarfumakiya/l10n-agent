@@ -217,7 +217,46 @@ async function detectPo(fs: FileSystem, root: string, files: string[]): Promise<
       questions,
     });
   }
+
+  // A template with no translations yet: how every gettext project starts.
+  const used = new Set(
+    out.flatMap((c) => (c.target.format === "po" && c.target.template ? [c.target.template] : [])),
+  );
+  for (const pot of pots) {
+    if (used.has(pot)) continue;
+    const pattern = newPoPattern(pot);
+    const target: TargetConfig = { format: "po", path: pattern, template: pot };
+    const t = await openTarget(fs, root, target, "en", "po");
+    const strings = t.source.entries.size;
+    if (strings === 0) continue;
+    out.push({
+      target,
+      confidence: "medium",
+      evidence: [
+        `template ${pot} with ${strings} string${strings === 1 ? "" : "s"}, no translations yet`,
+      ],
+      strings,
+      locales: [],
+      questions: [
+        `New translations will be written as ${pattern}. Change the path if your project expects another layout.`,
+      ],
+    });
+  }
   return out;
+}
+
+/** Where translations for a lone template usually go, by ecosystem convention. */
+export function newPoPattern(pot: string): string {
+  const dir = path.posix.dirname(pot);
+  const domain = path.posix.basename(pot, ".pot");
+  const prefix = dir === "." ? "" : `${dir}/`;
+  // Django and Babel: locale/django.pot → locale/{locale}/LC_MESSAGES/django.po
+  if (/(^|\/)(locale|locales)$/.test(dir))
+    return `${prefix}${LOCALE_TOKEN}/LC_MESSAGES/${domain}.po`;
+  // WordPress: languages/my-plugin.pot → languages/my-plugin-{locale}.po
+  if (/(^|\/)languages$/.test(dir)) return `${prefix}${domain}-${LOCALE_TOKEN}.po`;
+  // GNU projects and most others: po/app.pot → po/{locale}.po
+  return `${prefix}${LOCALE_TOKEN}.po`;
 }
 
 // ── Apple String Catalogs ────────────────────────────────────────────────────
@@ -255,12 +294,17 @@ async function detectXcstrings(
     const strings = [...t.source.entries.values()].filter((e) => e.translatable).length;
     out.push({
       target,
-      confidence: "high",
+      confidence: strings === 0 ? "medium" : "high",
       evidence: [`String Catalog with ${strings} string${strings === 1 ? "" : "s"}`],
       strings,
       locales: [...t.locales.keys()].sort(),
       ...(declared ? { sourceLocale: declared } : {}),
-      questions: [],
+      questions:
+        strings === 0
+          ? [
+              "The catalog is empty. Build the app in Xcode once so it collects your strings, then run detect again.",
+            ]
+          : [],
     });
   }
   return out;
@@ -278,7 +322,7 @@ function hints(files: string[], candidates: Candidate[], unsupported: Unsupporte
   );
   if (xcode && !has("xcstrings") && !appleLegacy) {
     out.push(
-      "This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Then run detect again.",
+      "This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Text built from variables needs moving to String(localized:) first (the l10n-extract skill helps). Then run detect again.",
     );
   }
   const gradle = files.some((f) => /(^|\/)build\.gradle(\.kts)?$/.test(f));
@@ -288,7 +332,7 @@ function hints(files: string[], candidates: Candidate[], unsupported: Unsupporte
     files.some((f) => /\/src\/main\/AndroidManifest\.xml$/.test(f))
   ) {
     out.push(
-      "This looks like an Android project with no strings in res/values yet. Move UI text into res/values/strings.xml, then run detect again.",
+      "This looks like an Android project with no strings in res/values yet: the UI text is probably written in the code. Move it into res/values/strings.xml first (the l10n-extract skill does this with your agent), then run detect again.",
     );
   }
   return out;

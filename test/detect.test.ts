@@ -3,7 +3,7 @@ import { parse as parseYaml } from "yaml";
 import { type Io, runInit } from "../src/cli/init-command.js";
 import { memoryFs } from "../src/core/fs.js";
 import { openProject } from "../src/core/project.js";
-import { detect, poPattern } from "../src/detect/detect.js";
+import { detect, newPoPattern, poPattern } from "../src/detect/detect.js";
 
 const strings = (...names: string[]) =>
   `<resources>${names.map((n) => `<string name="${n}">${n}</string>`).join("")}</resources>`;
@@ -33,7 +33,31 @@ describe("poPattern", () => {
   });
 });
 
+describe("newPoPattern", () => {
+  it.each([
+    ["po/app.pot", "po/{locale}.po"],
+    ["locale/django.pot", "locale/{locale}/LC_MESSAGES/django.po"],
+    ["languages/my-plugin.pot", "languages/my-plugin-{locale}.po"],
+    ["messages.pot", "{locale}.po"],
+  ])("%s → %s", (pot, pattern) => {
+    expect(newPoPattern(pot)).toBe(pattern);
+  });
+});
+
 describe("detect", () => {
+  it("offers a template with no translations yet, and flags an empty String Catalog", async () => {
+    const fs = memoryFs({
+      "/r/po/app.pot": po({ Hello: "", Bye: "" }),
+      "/r/App/Localizable.xcstrings": catalog("en", []),
+    });
+    const r = await detect(fs, "/r");
+    expect(r.candidates.map((c) => [c.target, c.confidence, c.strings])).toEqual([
+      [{ format: "po", path: "po/{locale}.po", template: "po/app.pot" }, "medium", 2],
+      [{ format: "xcstrings", path: "App/Localizable.xcstrings" }, "medium", 0],
+    ]);
+    expect(r.candidates[1]?.questions[0]).toMatch(/Build the app in Xcode/);
+  });
+
   it("finds Android modules and skips tests, build output and resource-only folders", async () => {
     const fs = memoryFs({
       "/r/app/src/main/res/values/strings.xml": strings("a", "b", "c"),

@@ -1,5 +1,5 @@
 import path from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parseDocument, parse as parseYaml } from "yaml";
 import { z } from "zod";
 import { UserError } from "./errors.js";
 import type { FileSystem } from "./fs.js";
@@ -211,4 +211,37 @@ export async function loadConfig(
     throw new ConfigError(`${file} is invalid:\n${details.join("\n")}`);
   }
   return { config: parsed.data, root: path.dirname(file), file };
+}
+
+/**
+ * Adds languages to `locales:` in the config file, keeping its comments and layout.
+ * Returns the locales actually added (already listed ones and the source are skipped).
+ */
+export async function addLocales(
+  fs: FileSystem,
+  file: string,
+  requested: string[],
+): Promise<{ added: string[]; locales: string[] }> {
+  let canonical: string[];
+  try {
+    canonical = Intl.getCanonicalLocales(
+      requested.map((l) => l.trim().replace(/_/g, "-")).filter(Boolean),
+    );
+  } catch {
+    throw new ConfigError(`Not a valid language code in: ${requested.join(", ")}`);
+  }
+  const doc = parseDocument(await fs.readFile(file));
+  const source = String(doc.get("sourceLocale") ?? "en");
+  const current = (doc.toJS()?.locales as string[] | undefined) ?? [];
+  const known = new Set(current.map((l) => Intl.getCanonicalLocales(l)[0]));
+  const added = canonical.filter((l) => l !== source && !known.has(l));
+  if (added.length) {
+    const locales = [...current, ...added];
+    const node = doc.createNode(locales);
+    node.flow = true;
+    doc.set("locales", node);
+    await fs.writeFile(file, doc.toString({ lineWidth: 0 }));
+    return { added, locales };
+  }
+  return { added, locales: current };
 }

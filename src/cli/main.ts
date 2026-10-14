@@ -1,6 +1,7 @@
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command, InvalidArgumentError } from "commander";
+import { addLocales, loadConfig } from "../core/config.js";
 import { UserError } from "../core/errors.js";
 import { nodeFs } from "../core/fs.js";
 import { openProject } from "../core/project.js";
@@ -109,6 +110,22 @@ program
       for (const line of describeDetect(result)) console.log(line);
       console.log("\nNext: `l10n init` writes these into l10n.config.yaml.");
     }
+  });
+
+program
+  .command("add-locale")
+  .description("Add languages to translate into, e.g. l10n add-locale hi,ar")
+  .argument("<locales>", "comma-separated language codes", locales)
+  .action(async (requested: string[]) => {
+    const g = globals();
+    const { file } = await loadConfig(nodeFs, g.cwd, g.config);
+    const { added, locales: all } = await addLocales(nodeFs, file, requested);
+    console.log(
+      added.length
+        ? `Added ${added.join(", ")}. Languages now: ${all.join(", ")}.`
+        : `Nothing to add. Languages: ${all.join(", ") || "none"}.`,
+    );
+    if (added.length) console.log("Next: translate them with your agent, or `l10n translate`.");
   });
 
 program
@@ -271,7 +288,10 @@ program
   .description("Run the MCP server over stdio, for Claude, Cursor, Codex and other MCP clients")
   .action(async () => {
     const { runServer } = await import("../mcp/server.js");
-    await runServer({ cwd: globals().cwd, version: VERSION });
+    // Claude Code doesn't promise to start servers in the project; it says where the project is.
+    const explicit = program.getOptionValueSource("cwd") !== "default";
+    const cwd = explicit ? globals().cwd : (process.env.CLAUDE_PROJECT_DIR ?? globals().cwd);
+    await runServer({ cwd, version: VERSION });
   });
 
 const setupNumbers = (v: string) => {

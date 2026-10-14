@@ -359,6 +359,15 @@ memory:
     parallel calls with one writer, one retry with the errors attached.
   - Claude Code plugin and marketplace manifests; `npx skills add`; install from GitHub.
   - 172 tests pass.
+- **Setup edge cases (2026-10-14):**
+  - Detects gettext projects that only have a `.pot` template (with the new-file path by
+    ecosystem) and flags empty String Catalogs.
+  - `add-locale` (CLI and MCP) edits the config, keeping comments.
+  - Skill `l10n-extract`: moving hardcoded Kotlin, XML and Swift text into resources, with
+    pseudolocale checks. Guidance only until P5 adds `scan-code` and `add-source`.
+  - The MCP server uses `CLAUDE_PROJECT_DIR`, since Claude Code doesn't promise to start
+    servers in the project folder.
+  - README rewritten for users; details moved to `docs/reference.md` and `CONTRIBUTING.md`.
 - **Next:**
   - Publish to npm so `npx l10n-agent` works without building from GitHub.
   - P3 formats (JSON, ARB, String Catalog substitutions).

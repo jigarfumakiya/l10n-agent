@@ -10,8 +10,8 @@ is the part code can't check: meaning, tone, terminology, grammar and fit.
 
 ## Running the tool
 
-Use the `l10n_*` MCP tools when available; otherwise the CLI `l10n <command>`, or
-`npx -y github:jigarfumakiya/l10n-agent <command>` if it isn't installed.
+Use the `l10n_*` MCP tools when available; otherwise the CLI `l10n <command>`. If it isn't
+installed, ask to install it once with `npm install -g github:jigarfumakiya/l10n-agent`.
 
 ## Steps
 
@@ -24,6 +24,9 @@ Use the `l10n_*` MCP tools when available; otherwise the CLI `l10n <command>`, o
    ```
    Each item shows `source` and the translation as `current`, with the comment, plural forms
    and glossary. Read `.l10n/brief.md` and the locale's voice first.
+   To review translations made before l10n-agent, use `--states untracked`; for hand edits,
+   `--states edited`. Fixing those replaces a person's work, so ask before resubmitting, and
+   pass `--force` only then.
 
 3. Review each translation:
    - **Accuracy:** same meaning as the source; nothing added or dropped.

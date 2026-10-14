@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { ConfigError, loadConfig } from "../src/core/config.js";
+import { addLocales, ConfigError, loadConfig } from "../src/core/config.js";
 import { memoryFs } from "../src/core/fs.js";
 
 describe("config", () => {
@@ -46,5 +46,31 @@ describe("config typos", () => {
       /unknown key "templat" \(did you mean "template"\?\)/,
     );
     expect(String((err as Error).message)).toMatch(/unknown key "colour"\n|unknown key "colour"$/);
+  });
+});
+
+describe("addLocales", () => {
+  it("appends languages, keeps comments, and skips the source and ones already there", async () => {
+    const fs = memoryFs({
+      "/a/l10n.config.yaml":
+        "# my app\nsourceLocale: en\nlocales: [hi]\ntargets:\n  - format: po\n    path: po/{locale}.po # here\n",
+    });
+    const r = await addLocales(fs, "/a/l10n.config.yaml", ["ar", "hi", "en", "pt_BR"]);
+    expect(r).toEqual({ added: ["ar", "pt-BR"], locales: ["hi", "ar", "pt-BR"] });
+    const text = fs.files.get("/a/l10n.config.yaml");
+    expect(text).toContain("# my app");
+    expect(text).toContain("locales: [ hi, ar, pt-BR ]");
+    expect(text).toContain("# here");
+    expect((await loadConfig(fs, "/a")).config.locales).toEqual(["hi", "ar", "pt-BR"]);
+  });
+
+  it("adds a locales list when there is none, and rejects bad codes", async () => {
+    const fs = memoryFs({
+      "/a/l10n.config.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
+    });
+    expect((await addLocales(fs, "/a/l10n.config.yaml", ["hi"])).locales).toEqual(["hi"]);
+    await expect(addLocales(fs, "/a/l10n.config.yaml", ["not a code"])).rejects.toThrow(
+      ConfigError,
+    );
   });
 });

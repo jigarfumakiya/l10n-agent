@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { runInit } from "../cli/init-command.js";
+import { addLocales, loadConfig } from "../core/config.js";
 import { CONTEXT_FILES, writeContext } from "../core/context.js";
 import { UserError } from "../core/errors.js";
 import { type FileSystem, nodeFs } from "../core/fs.js";
@@ -144,6 +145,16 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
+    "l10n_add_locales",
+    "Add languages to translate into (BCP 47 codes such as hi, ar, pt-BR) to the project config.",
+    { cwd: cwdArg, locales: z.array(z.string()).min(1) },
+    async ({ cwd, locales }) => {
+      const { file } = await loadConfig(fs, dir(cwd));
+      return addLocales(fs, file, locales);
+    },
+  );
+
+  tool(
     "l10n_get_context",
     "The project's translation brief, voice per locale and glossary.",
     { cwd: cwdArg },
@@ -247,7 +258,7 @@ ${TRANSLATION_RULES}`,
     async ({ cwd, targets, ...o }) => translateProject(await project(cwd), { ...o, targets }),
   );
 
-  for (const name of ["l10n-setup", "l10n-translate", "l10n-review"] as const) {
+  for (const name of ["l10n-setup", "l10n-extract", "l10n-translate", "l10n-review"] as const) {
     const skill = readSkill(name);
     if (!skill) continue;
     server.registerPrompt(name, { description: skill.description }, () => ({

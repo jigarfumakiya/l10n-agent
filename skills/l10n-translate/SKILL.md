@@ -12,9 +12,11 @@ You translate. Don't edit translation files by hand.
 ## Running the tool
 
 - If `l10n_*` MCP tools are available, use them: `l10n_next_batch`, `l10n_submit`, …
-- Otherwise run the CLI: `l10n <command>`, or `npx -y github:jigarfumakiya/l10n-agent <command>`
-  if `l10n` isn't installed.
+- Otherwise run the CLI: `l10n <command>`. If it isn't installed, ask to install it once with
+  `npm install -g github:jigarfumakiya/l10n-agent`.
 - No `l10n.config.yaml`? Run the `l10n-setup` skill first.
+- A language that isn't configured yet: `l10n add-locale <code>` first.
+- Check `git status` first and mention uncommitted changes, so the translation diff stays reviewable.
 
 ## 1. Size up the work
 
