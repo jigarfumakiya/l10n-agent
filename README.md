@@ -28,13 +28,18 @@ only see an app description for context. l10n-agent takes a different approach:
 
 ## Install
 
-Not on npm yet. Run it from source (Node 22 or newer):
+Not on npm yet. Install it from GitHub (Node 22 or newer, on macOS, Linux or Windows):
+
+```sh
+npm install -g github:jigarfumakiya/l10n-agent
+```
+
+Or work from a clone:
 
 ```sh
 git clone https://github.com/jigarfumakiya/l10n-agent.git
 cd l10n-agent
-npm install
-npm run build
+npm install       # also builds
 npm link          # puts `l10n` on your PATH; or run `node dist/cli.js`
 ```
 

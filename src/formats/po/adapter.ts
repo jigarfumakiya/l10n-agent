@@ -5,6 +5,7 @@ import {
   inferLocaleStyle,
   matchPattern,
   parseLocaleSegment,
+  relativePath,
 } from "../../core/paths.js";
 import { findPlaceholders, type PlaceholderSyntax } from "../../core/placeholders.js";
 import { pluralCategories } from "../../core/plurals.js";
@@ -72,7 +73,7 @@ export const poAdapter: FormatAdapter<PoTarget> = {
     /** Source entries as gettext entries, to copy comments and ids into new translations. */
     const sourcePo = new Map<string, PoEntry>();
     let template: PoFile | undefined;
-    const rel = (abs: string) => path.relative(root, abs);
+    const rel = (abs: string) => relativePath(root, abs);
 
     const read = async (abs: string, locale: string): Promise<PoFile | undefined> => {
       try {

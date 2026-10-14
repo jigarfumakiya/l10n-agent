@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { Catalog, Entry, Issue, Message } from "../../core/model.js";
+import { relativePath } from "../../core/paths.js";
 import { findPlaceholders } from "../../core/placeholders.js";
 import { cldrPluralSpec } from "../../core/plurals.js";
 import type { FormatAdapter, Target, WriteResult } from "../types.js";
@@ -45,7 +46,7 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
 
   async open(config, { fs, root, sourceLocale, id }) {
     const abs = path.resolve(root, config.path);
-    const rel = path.relative(root, abs);
+    const rel = relativePath(root, abs);
     const issues: Issue[] = [];
     const source: Catalog = { locale: sourceLocale, entries: new Map() };
     const locales = new Map<string, Catalog>();

@@ -6,6 +6,11 @@ import type { FileSystem } from "./fs.js";
  * - bcp47: `pt-BR`, `sr-Latn`
  * - gettext: `pt_BR`, `sr@latin`
  */
+/** `abs` relative to `root` with forward slashes on every OS, as reports and the lockfile show it. */
+export function relativePath(root: string, abs: string): string {
+  return path.relative(root, abs).split(path.sep).join("/");
+}
+
 export type LocaleStyle = "bcp47" | "gettext";
 
 const LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" });

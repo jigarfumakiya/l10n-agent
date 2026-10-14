@@ -7,6 +7,7 @@ import {
   PLURAL_CATEGORIES,
   type PluralCategory,
 } from "../../core/model.js";
+import { relativePath } from "../../core/paths.js";
 import { cldrPluralSpec } from "../../core/plurals.js";
 import type { FormatAdapter, Target, WriteResult } from "../types.js";
 import { folderToLocale, localeToFolder } from "./folders.js";
@@ -82,7 +83,7 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
         .sort();
       for (const name of xmlFiles) {
         const abs = path.join(resDir, dir, name);
-        const rel = path.relative(root, abs);
+        const rel = relativePath(root, abs);
         let doc: XmlDocument;
         try {
           doc = parseXml(await fs.readFile(abs));
@@ -157,7 +158,7 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
           text = serializeResources(entries, attrs);
         }
         await fs.writeFile(abs, text);
-        written.push(path.relative(root, abs));
+        written.push(relativePath(root, abs));
       }
       return { files: written };
     }

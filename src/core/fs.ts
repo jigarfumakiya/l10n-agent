@@ -32,28 +32,30 @@ export const nodeFs: FileSystem = {
   },
 };
 
-/** In-memory file system for tests. */
+/** In-memory file system for tests. Paths are POSIX; Windows paths (`C:\r\x`) map to `/r/x`. */
 export function memoryFs(files: Record<string, string> = {}): FileSystem & {
   files: Map<string, string>;
 } {
   const map = new Map(Object.entries(files));
+  const norm = (p: string) => p.replace(/\\/g, "/").replace(/^[A-Za-z]:/, "");
+  const dirPrefix = (dir: string) => (norm(dir).endsWith("/") ? norm(dir) : `${norm(dir)}/`);
   return {
     files: map,
     async readFile(file) {
-      const v = map.get(file);
+      const v = map.get(norm(file));
       if (v === undefined) throw new Error(`ENOENT: ${file}`);
       return v;
     },
     async writeFile(file, content) {
-      map.set(file, content);
+      map.set(norm(file), content);
     },
     async exists(file) {
-      if (map.has(file)) return true;
-      const prefix = file.endsWith("/") ? file : `${file}/`;
+      if (map.has(norm(file))) return true;
+      const prefix = dirPrefix(file);
       return [...map.keys()].some((k) => k.startsWith(prefix));
     },
     async listDir(dir) {
-      const prefix = dir.endsWith("/") ? dir : `${dir}/`;
+      const prefix = dirPrefix(dir);
       const seen = new Map<string, boolean>();
       for (const k of map.keys()) {
         if (!k.startsWith(prefix)) continue;
