@@ -282,6 +282,30 @@ export const poAdapter: FormatAdapter<PoTarget> = {
       return { files: [rel(f.file)] };
     }
 
+    async function removeTranslations(locale: string, keys: string[]): Promise<WriteResult> {
+      const f = files.get(locale);
+      if (!f) return { files: [] };
+      const nplurals = formsFor(locale)?.nplurals;
+      let changed = false;
+      for (const key of keys) {
+        const po = f.byKey.get(key);
+        if (!po) continue;
+        if (sourcePo.has(key)) {
+          // Still in the template: an empty msgstr is how gettext says "not translated".
+          const blank = blankFrom(po, nplurals).msgstr;
+          if (po.msgstr.every((v) => v === "") && !po.flags.includes("fuzzy")) continue;
+          f.po.update(po, blank, false);
+        } else {
+          f.po.remove(po);
+          f.byKey.delete(key);
+        }
+        changed = true;
+      }
+      if (!changed) return { files: [] };
+      await fs.writeFile(f.file, f.po.toString());
+      return { files: [rel(f.file)] };
+    }
+
     function newFile(locale: string): PoFile {
       const base = template ?? files.get(sourceLocale)?.po;
       const po = PoFile.create({ eol: base?.eol, wrap: base?.wrap });
@@ -319,6 +343,7 @@ export const poAdapter: FormatAdapter<PoTarget> = {
         return gettextPluralSpec(parsePluralForms(fallback), from);
       },
       writeLocale,
+      removeTranslations,
     } satisfies Target;
   },
 };

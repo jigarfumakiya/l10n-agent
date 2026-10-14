@@ -12,7 +12,14 @@ import { type FileSystem, nodeFs } from "../core/fs.js";
 import { openProject } from "../core/project.js";
 import { computeStatus, ENTRY_STATES } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
-import { approve, nextBatch, SubmissionSchema, submit } from "../core/workflow.js";
+import {
+  approve,
+  nextBatch,
+  prune,
+  removeTranslations,
+  SubmissionSchema,
+  submit,
+} from "../core/workflow.js";
 import { detect } from "../detect/detect.js";
 import { TRANSLATION_RULES } from "../translate/prompt.js";
 import { translateProject } from "../translate/translate.js";
@@ -243,6 +250,30 @@ ${TRANSLATION_RULES}`,
     },
     async ({ cwd, from, reviewed, ...o }) =>
       approve(await project(cwd), { ...o, states: from, to: reviewed ? "reviewed" : "approved" }),
+  );
+
+  tool(
+    "l10n_remove",
+    "Make translations untranslated again (e.g. reject bad drafts) so they get redone. Pass keys, states, or both. Hand edits and reviewed, approved or untracked translations are kept unless force is set; set it only when the user asks.",
+    {
+      cwd: cwdArg,
+      locales: localesArg,
+      targets: targetsArg,
+      keys: keysArg,
+      states: statesArg.describe('Entries in these states, e.g. ["draft"]'),
+      force: z.boolean().optional(),
+      dryRun: z.boolean().optional(),
+    },
+    async ({ cwd, ...o }) => removeTranslations(await project(cwd), o),
+    { destructiveHint: true },
+  );
+
+  tool(
+    "l10n_prune",
+    "Remove translations of strings that were deleted, renamed or marked not translatable, and their lockfile records. Use dryRun first and show the user.",
+    { cwd: cwdArg, targets: targetsArg, dryRun: z.boolean().optional() },
+    async ({ cwd, ...o }) => prune(await project(cwd), o),
+    { destructiveHint: true },
   );
 
   tool(

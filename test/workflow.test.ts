@@ -4,7 +4,7 @@ import { memoryFs } from "../src/core/fs.js";
 import { openProject } from "../src/core/project.js";
 import { computeStatus } from "../src/core/status.js";
 import { validateProject } from "../src/core/validate.js";
-import { approve, nextBatch, submit } from "../src/core/workflow.js";
+import { approve, nextBatch, prune, removeTranslations, submit } from "../src/core/workflow.js";
 import { prepareAndroidValue } from "../src/formats/android/value.js";
 
 const STRINGS = `<?xml version="1.0" encoding="utf-8"?>
@@ -61,7 +61,7 @@ const open = (fs: ReturnType<typeof project>) => openProject(fs, { cwd: "/p" });
 
 describe("nextBatch", () => {
   it("lists what needs translating with plural forms, placeholders, glossary and context", async () => {
-    const batch = nextBatch(await open(project()), { locales: ["ar"] });
+    const batch = await nextBatch(await open(project()), { locales: ["ar"] });
     expect(batch.items.map((i) => `${i.target} ${i.key}`)).toEqual([
       "android save",
       "android welcome",
@@ -90,11 +90,11 @@ describe("nextBatch", () => {
 
   it("includes voice per locale, limits and pages", async () => {
     const p = await open(project());
-    const first = nextBatch(p, { locales: ["hi"], limit: 2 });
+    const first = await nextBatch(p, { locales: ["hi"], limit: 2 });
     expect(first.items).toHaveLength(2);
     expect(first.remaining).toBe(3);
     expect(first.locales.hi?.voice).toBe("Use तुम, not आप.");
-    const second = nextBatch(p, { locales: ["hi"], limit: 2, offset: 2 });
+    const second = await nextBatch(p, { locales: ["hi"], limit: 2, offset: 2 });
     expect(second.items.map((i) => i.key)).toEqual(["days_left", "cancel"]);
   });
 });
@@ -210,7 +210,7 @@ describe("submit", () => {
   it("offers translations of the same text from other targets", async () => {
     const fs = project();
     await submit(await open(fs), [{ locale: "hi", key: "Cancel", value: "रद्द करें" }]);
-    const batch = nextBatch(await open(fs), { locales: ["hi"], keys: ["cancel"] });
+    const batch = await nextBatch(await open(fs), { locales: ["hi"], keys: ["cancel"] });
     expect(batch.items[0]?.memory).toEqual([{ value: "रद्द करें", from: "xcstrings:Cancel" }]);
   });
 
@@ -312,6 +312,35 @@ describe("glossary", () => {
   });
 });
 
+describe("gettext removal", () => {
+  it("empties msgstr for strings still in the template and deletes ones that left it", async () => {
+    const files = memoryFs({
+      "/g/l10n.config.yaml":
+        "locales: [de]\ntargets:\n  - format: po\n    path: po/{locale}.po\n    template: po/app.pot\n",
+      "/g/po/app.pot":
+        'msgid ""\nmsgstr "Content-Type: text/plain; charset=UTF-8\\n"\n\nmsgid "Hello"\nmsgstr ""\n',
+      "/g/po/de.po": [
+        'msgid ""',
+        'msgstr "Content-Type: text/plain; charset=UTF-8\\n"',
+        "",
+        "#, fuzzy",
+        'msgid "Hello"',
+        'msgstr "Hallo"',
+        "",
+        'msgid "Gone"',
+        'msgstr "Weg"',
+        "",
+      ].join("\n"),
+    });
+    const p = await openProject(files, { cwd: "/g" });
+    expect((await removeTranslations(p, { keys: ["Hello"] })).removed).toHaveLength(1);
+    expect((await prune(await openProject(files, { cwd: "/g" }))).removed).toHaveLength(1);
+    expect(files.files.get("/g/po/de.po")).toBe(
+      'msgid ""\nmsgstr "Content-Type: text/plain; charset=UTF-8\\n"\n\nmsgid "Hello"\nmsgstr ""\n',
+    );
+  });
+});
+
 describe("submit to gettext", () => {
   const fs = () =>
     memoryFs({
@@ -333,7 +362,7 @@ describe("submit to gettext", () => {
   it("asks for numbered forms with examples and writes a new file without fuzzy", async () => {
     const files = fs();
     const p = await openProject(files, { cwd: "/g" });
-    const [item] = nextBatch(p).items;
+    const [item] = (await nextBatch(p)).items;
     expect(item?.pluralForms?.map((f) => [f.form, f.examples.split(",")[0]])).toEqual([
       ["0", "1"],
       ["1", "2"],
@@ -351,5 +380,109 @@ describe("submit to gettext", () => {
     expect(po).toContain('msgstr[2] "%(n)d файлов"');
     expect(po).not.toContain("fuzzy");
     expect(computeStatus(await openProject(files, { cwd: "/g" }))[0]?.counts.draft).toBe(1);
+  });
+});
+
+describe("stale entries", () => {
+  it("show the source text the old translation was made from", async () => {
+    const fs = project();
+    await submit(await open(fs), [{ locale: "hi", key: "save", value: "सहेजें" }]);
+    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    expect(lock.targets.android.hi.save.sourceText).toBe("Save");
+    const src = "/p/app/src/main/res/values/strings.xml";
+    fs.files.set(src, (fs.files.get(src) ?? "").replace(">Save<", ">Save budget<"));
+    const [item] = (await nextBatch(await open(fs), { locales: ["hi"], keys: ["save"] })).items;
+    expect(item).toMatchObject({
+      state: "stale",
+      source: "Save budget",
+      previousSource: "Save",
+      current: "सहेजें",
+    });
+  });
+});
+
+describe("removeTranslations", () => {
+  it("rejects drafts so they come back as missing, and keeps the rest of the file", async () => {
+    const fs = project();
+    await submit(await open(fs), [
+      { locale: "hi", key: "save", value: "सहेजें" },
+      { locale: "hi", key: "cancel", value: "रद्द करें" },
+      { locale: "hi", key: "Cancel", value: "रद्द करें" },
+    ]);
+    const r = await removeTranslations(await open(fs), {
+      locales: ["hi"],
+      keys: ["save", "Cancel"],
+    });
+    expect(r.removed.map((x) => `${x.target} ${x.key} ${x.from}`)).toEqual([
+      "android save draft",
+      "xcstrings Cancel draft",
+    ]);
+    expect(fs.files.get("/p/app/src/main/res/values-hi/strings.xml")).toBe(
+      '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="cancel">रद्द करें</string>\n</resources>\n',
+    );
+    const catalog = JSON.parse(fs.files.get("/p/ios/Localizable.xcstrings") ?? "{}");
+    expect(catalog.strings.Cancel).toEqual({ comment: "Dismisses a sheet" });
+    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    expect(Object.keys(lock.targets.android.hi)).toEqual(["cancel"]);
+    const states = computeStatus(await open(fs), ["hi"])[0]?.entries;
+    expect(states?.find((e) => e.key === "save")?.state).toBe("missing");
+  });
+
+  it("keeps a person's work unless forced, and needs keys or states", async () => {
+    const fs = project({
+      "/p/app/src/main/res/values-hi/strings.xml":
+        '<resources>\n  <string name="save">सहेजें</string>\n</resources>\n',
+    });
+    const kept = await removeTranslations(await open(fs), { states: ["untracked"] });
+    expect(kept.removed).toEqual([]);
+    expect(kept.refused).toEqual([
+      { target: "android", locale: "hi", key: "save", state: "untracked" },
+    ]);
+    const forced = await removeTranslations(await open(fs), { keys: ["save"], force: true });
+    expect(forced.removed).toHaveLength(1);
+    expect(fs.files.get("/p/app/src/main/res/values-hi/strings.xml")).toBe(
+      "<resources>\n</resources>\n",
+    );
+    await expect(removeTranslations(await open(fs), {})).rejects.toThrow(/keys, states/);
+  });
+});
+
+describe("prune", () => {
+  it("removes translations of deleted and untranslatable strings, and their lock records", async () => {
+    const fs = project({
+      "/p/app/src/main/res/values-ar/strings.xml": [
+        "<resources>",
+        "    <!-- Old screen -->",
+        '    <string name="old_key">قديم</string>',
+        '    <string name="brand">ستيل موني</string>',
+        '    <string name="cancel">إلغاء</string>',
+        "</resources>",
+        "",
+      ].join("\n"),
+      "/p/.l10n/lock.json": JSON.stringify({
+        version: 1,
+        targets: {
+          android: { ar: { old_key: { source: "x", target: "y", state: "draft" } } },
+          gone: {},
+        },
+      }),
+    });
+    const dry = await prune(await open(fs), { dryRun: true });
+    expect(dry.removed.map((r) => `${r.key} ${r.reason}`)).toEqual([
+      "old_key orphan",
+      "brand not-translatable",
+    ]);
+    expect(dry.lockEntries).toBe(1);
+    expect(fs.files.get("/p/app/src/main/res/values-ar/strings.xml")).toContain("old_key");
+
+    const r = await prune(await open(fs));
+    expect(r.files).toEqual(["app/src/main/res/values-ar/strings.xml"]);
+    expect(fs.files.get("/p/app/src/main/res/values-ar/strings.xml")).toBe(
+      '<resources>\n    <!-- Old screen -->\n    <string name="cancel">إلغاء</string>\n</resources>\n',
+    );
+    expect(JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}").targets).toEqual({
+      android: { ar: {} },
+    });
+    expect((await prune(await open(fs))).removed).toEqual([]);
   });
 });

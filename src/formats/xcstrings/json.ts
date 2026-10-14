@@ -242,3 +242,19 @@ export function setPath(
     node = entry.value;
   }
 }
+
+/** Removes the value at `path`, marking every object on the way as changed. Returns false if absent. */
+export function deletePath(root: JObject, path: string[]): boolean {
+  const chain: JObject[] = [root];
+  for (const key of path.slice(0, -1)) {
+    const next = child(chain.at(-1), key);
+    if (next?.kind !== "object") return false;
+    chain.push(next);
+  }
+  const parent = chain.at(-1) as JObject;
+  const at = parent.entries.findIndex((e) => e.key === path.at(-1));
+  if (at < 0) return false;
+  parent.entries.splice(at, 1);
+  for (const node of chain) node.raw = undefined;
+  return true;
+}

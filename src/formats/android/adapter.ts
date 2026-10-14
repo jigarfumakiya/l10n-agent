@@ -58,6 +58,7 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
       prepareValue: (value, entry) => prepareAndroidValue(value, sourceRaw(entry.message)),
       pluralSpec: (locale) => cldrPluralSpec(locale),
       writeLocale: (catalog) => writeLocale(catalog),
+      removeTranslations: (locale, keys) => removeTranslations(locale, keys),
     };
 
     if (!(await fs.exists(resDir))) {
@@ -164,9 +165,53 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
       return { files: written };
     }
 
+    async function removeTranslations(locale: string, keys: string[]): Promise<WriteResult> {
+      const catalog = locales.get(locale);
+      if (!catalog) return { files: [] };
+      const byFile = new Map<string, string[]>();
+      for (const key of keys) {
+        const entry = catalog.entries.get(key);
+        if (!entry) continue;
+        const abs = path.resolve(root, entry.file);
+        byFile.set(abs, [...(byFile.get(abs) ?? []), key]);
+      }
+      const written: string[] = [];
+      for (const [abs, fileKeys] of byFile) {
+        const file = localeFiles.get(abs);
+        if (!file) continue;
+        const spans = fileKeys.flatMap((k) => {
+          const span = file.spans.get(k);
+          return span ? [span] : [];
+        });
+        if (spans.length === 0) continue;
+        await fs.writeFile(abs, removeSpans(file.doc.source, spans));
+        written.push(relativePath(root, abs));
+      }
+      return { files: written };
+    }
+
     return target;
   },
 };
+
+/** Cuts elements out with their indent and line break; comments and neighbors stay. */
+function removeSpans(src: string, spans: Array<{ start: number; end: number }>): string {
+  let out = src;
+  for (const span of [...spans].sort((a, b) => b.start - a.start)) {
+    let start = span.start;
+    let end = span.end;
+    const lineStart = out.lastIndexOf("\n", start - 1) + 1;
+    if (/^[ \t]*$/.test(out.slice(lineStart, start))) {
+      const rest = /^[ \t]*(\r?\n)?/.exec(out.slice(end))?.[0] ?? "";
+      if (rest.endsWith("\n")) {
+        start = lineStart;
+        end += rest.length;
+      }
+    }
+    out = out.slice(0, start) + out.slice(end);
+  }
+  return out;
+}
 
 function readEntries(
   doc: XmlDocument,

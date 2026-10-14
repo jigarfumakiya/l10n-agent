@@ -6,6 +6,7 @@ import { cldrPluralSpec } from "../../core/plurals.js";
 import type { FormatAdapter, Target, WriteResult } from "../types.js";
 import {
   child,
+  deletePath,
   detectStyle,
   fromJs,
   type JObject,
@@ -78,6 +79,7 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
         return spec;
       },
       writeLocale: (catalog) => writeLocale(catalog),
+      removeTranslations: (locale, keys) => removeTranslations(locale, keys),
     };
 
     if (!(await fs.exists(abs))) {
@@ -206,6 +208,23 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
           order,
         );
       }
+      await fs.writeFile(abs, stringifyJson(doc, style));
+      return { files: [rel] };
+    }
+
+    async function removeTranslations(locale: string, keys: string[]): Promise<WriteResult> {
+      if (!doc) throw new Error(`${rel} could not be read, so it can't be written`);
+      let changed = false;
+      for (const key of keys) {
+        if (!deletePath(doc, ["strings", key, "localizations", locale])) continue;
+        changed = true;
+        // Xcode leaves out an empty localizations object.
+        const rest = child(child(child(doc, "strings"), key), "localizations");
+        if (rest?.kind === "object" && rest.entries.length === 0) {
+          deletePath(doc, ["strings", key, "localizations"]);
+        }
+      }
+      if (!changed) return { files: [] };
       await fs.writeFile(abs, stringifyJson(doc, style));
       return { files: [rel] };
     }

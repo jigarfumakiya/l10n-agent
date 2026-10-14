@@ -25,6 +25,8 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 | `l10n submit [file]` | Checks translations (JSON from a file or stdin) and writes the good ones as drafts. Exit code 1 if any are rejected |
 | `l10n translate` | Translates with a model API, through the same checks |
 | `l10n approve` | Marks drafts approved (or `--reviewed`) |
+| `l10n remove` | Makes translations untranslated again (`--keys`, `--states draft`), e.g. to reject bad drafts. A person's work needs `--force` |
+| `l10n prune` | Removes translations of strings that were deleted, renamed or marked not translatable, and their lockfile records |
 | `l10n mcp` | Runs the MCP server over stdio |
 
 Options:
@@ -50,7 +52,8 @@ Options:
 ## MCP tools
 
 `l10n_status`, `l10n_validate`, `l10n_detect`, `l10n_init`, `l10n_add_locales`, `l10n_get_context`,
-`l10n_update_context`, `l10n_next_batch`, `l10n_submit`, `l10n_approve`, `l10n_translate`.
+`l10n_update_context`, `l10n_next_batch`, `l10n_submit`, `l10n_approve`, `l10n_remove`, `l10n_prune`,
+`l10n_translate`.
 The skills are also served as MCP prompts (`l10n-setup`, `l10n-extract`, `l10n-translate`, `l10n-review`) for
 clients that don't read skills. Every tool takes an optional `cwd`. Without one, the server works in the project Claude Code
 names in `CLAUDE_PROJECT_DIR`, else the directory it was started in (or `-C <dir>`).
@@ -80,6 +83,13 @@ with what a translator needs:
   "memory": [{ "value": "…", "from": "ios:Trash" }]
 }
 ```
+
+Items also carry `usage`: up to three places in the code that show the string, with the file and
+line and the code around it, so the model can tell a button from a title. It's found from
+`R.string.*` and `@string/*` (Android), Swift string literals matched to catalog keys,
+interpolations included (String Catalogs), and `#:` references (gettext). A stale item also
+carries `previousSource`, the text the old translation was made from, so only the change is
+retranslated.
 
 `submit` runs the same checks as `validate`. Translations with errors come back with the
 reasons and are not written. The agent fixes those and resubmits. Accepted ones become drafts,

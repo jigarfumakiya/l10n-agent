@@ -86,6 +86,11 @@ listing, website copy and the strings themselves, then show the user and adjust.
 
 Without file access, use `l10n_update_context` instead.
 
+## Cleaning up
+
+After strings are deleted or renamed, `l10n prune --dry-run` shows leftover translations; show
+the user, then run `l10n prune`.
+
 ## Adding languages later
 
 `l10n add-locale fr,de` (or `l10n_add_locales`), then translate with `l10n-translate`.

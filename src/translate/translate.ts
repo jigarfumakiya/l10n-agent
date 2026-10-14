@@ -1,6 +1,7 @@
 import { UserError } from "../core/errors.js";
 import { type Project, projectLocales, reopenProject } from "../core/project.js";
 import type { EntryState } from "../core/status.js";
+import { buildUsageIndex } from "../core/usage.js";
 import {
   type Batch,
   type BatchItem,
@@ -89,6 +90,8 @@ export async function translateProject(
   const tries = new Map<string, RetryInfo & { count: number; item: BatchItem }>();
   const givenUp = new Set<string>();
   let project = start;
+  // Code doesn't change during a run; index it once.
+  const usages = await buildUsageIndex(start);
 
   for (;;) {
     // Plan a round: up to `concurrency` batches, never two holding the same entry.
@@ -96,7 +99,7 @@ export async function translateProject(
     for (const locale of locales) {
       let offset = 0;
       while (round.length < concurrency) {
-        const batch = nextBatch(project, {
+        const batch = await nextBatch(project, {
           locales: [locale],
           targets: opts.targets,
           keys: opts.keys,
@@ -104,6 +107,7 @@ export async function translateProject(
           limit: batchSize,
           offset,
           skip: givenUp,
+          usages,
         });
         if (batch.items.length === 0) break;
         round.push(batch);

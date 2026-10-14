@@ -7,7 +7,14 @@ import { nodeFs } from "../core/fs.js";
 import { openProject } from "../core/project.js";
 import { computeStatus, ENTRY_STATES, type EntryState } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
-import { approve, nextBatch, parseSubmitInput, submit } from "../core/workflow.js";
+import {
+  approve,
+  nextBatch,
+  parseSubmitInput,
+  prune,
+  removeTranslations,
+  submit,
+} from "../core/workflow.js";
 import { detect } from "../detect/detect.js";
 import { translateProject } from "../translate/translate.js";
 import { runInit } from "./init-command.js";
@@ -147,7 +154,7 @@ program
       offset: number;
     }) => {
       const project = await openProject(nodeFs, globals());
-      const batch = nextBatch(project, {
+      const batch = await nextBatch(project, {
         locales: opts.locale,
         targets: opts.target,
         keys: opts.keys,
@@ -230,6 +237,79 @@ program
       else printApprove(result, to);
     },
   );
+
+program
+  .command("remove")
+  .description("Make translations untranslated again, e.g. to reject bad drafts")
+  .option("-l, --locale <list>", "comma-separated locales", locales)
+  .option("-t, --target <list>", "only these target ids", list)
+  .option("-k, --keys <list>", "these keys", list)
+  .option("--states <list>", "entries in these states, e.g. draft", states)
+  .option("--force", "also remove hand edits and reviewed, approved or untracked translations")
+  .option("--dry-run", "show what would be removed")
+  .option("--json", "machine-readable output")
+  .action(
+    async (opts: {
+      locale?: string[];
+      target?: string[];
+      keys?: string[];
+      states?: EntryState[];
+      force?: boolean;
+      dryRun?: boolean;
+      json?: boolean;
+    }) => {
+      const project = await openProject(nodeFs, globals());
+      const result = await removeTranslations(project, {
+        locales: opts.locale,
+        targets: opts.target,
+        keys: opts.keys,
+        states: opts.states,
+        force: opts.force,
+        dryRun: opts.dryRun,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      const verb = result.dryRun ? "Would remove" : "Removed";
+      console.log(
+        `${verb} ${result.removed.length} translation${result.removed.length === 1 ? "" : "s"}.`,
+      );
+      for (const r of result.refused) {
+        console.log(`  kept ${r.locale} ${r.key}: ${r.state} (pass --force to remove)`);
+      }
+      for (const f of result.files) console.log(`  ${f}`);
+    },
+  );
+
+program
+  .command("prune")
+  .description("Remove translations of strings that were deleted, renamed or made untranslatable")
+  .option("-t, --target <list>", "only these target ids", list)
+  .option("--dry-run", "show what would be removed")
+  .option("--json", "machine-readable output")
+  .action(async (opts: { target?: string[]; dryRun?: boolean; json?: boolean }) => {
+    const project = await openProject(nodeFs, globals());
+    const result = await prune(project, { targets: opts.target, dryRun: opts.dryRun });
+    if (opts.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    if (result.removed.length === 0 && result.lockEntries === 0) {
+      console.log("Nothing to clean up.");
+      return;
+    }
+    const verb = result.dryRun ? "Would remove" : "Removed";
+    console.log(
+      `${verb} ${result.removed.length} leftover translation${result.removed.length === 1 ? "" : "s"} and ${result.lockEntries} lockfile record${result.lockEntries === 1 ? "" : "s"}.`,
+    );
+    for (const r of result.removed) {
+      console.log(
+        `  ${r.locale} ${r.key}: ${r.reason === "orphan" ? "no longer in the source" : "marked not translatable"}`,
+      );
+    }
+    for (const f of result.files) console.log(`  ${f}`);
+  });
 
 program
   .command("translate")

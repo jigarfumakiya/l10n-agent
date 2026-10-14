@@ -24,9 +24,9 @@ Gemini CLI, VS Code, Claude Desktop**, or plain terminal commands.
 - **Nothing breaks.** Every translation is checked in code before it's written: placeholders like
   `%1$s`, all the plural forms each language needs, Android escaping, markup. A translation that
   would crash your app or break the build is sent back to the AI to fix, never saved.
-- **Translations that fit your app.** The AI gets each string's comment, the plural rules of the
-  language, your glossary, your brand voice, and how the same text was already translated on
-  your other platform.
+- **Translations that fit your app.** The AI sees the code that shows each string (so it knows a
+  button from a title), its comment, the plural rules of the language, your glossary, your brand
+  voice, and how the same text was already translated on your other platform.
 - **Your files, your repo.** Translations go into the files your app already uses, formatted the
   way Android Studio and Xcode write them, so diffs are small and easy to review.
 - **Any model.** Your coding agent's own model, or any API: Claude, GPT, Gemini, OpenRouter, or a
@@ -72,6 +72,7 @@ When you're happy, say "approve them" and build your app as usual.
 | **Adding a language later** | "Add French." |
 | **You changed some copy** | Only the changed strings are retranslated. Everything else stays put |
 | **New strings in a feature branch** | "Translate the new strings." |
+| **You deleted or renamed strings** | "Clean up old translations." Leftovers are removed; nothing else is touched |
 
 ## Other AI tools
 

@@ -7,6 +7,7 @@ import { getLockEntry, type Lockfile, type StoredState, setLockEntry, writeLock 
 import { displayKey, type Entry, type Message, messageValues } from "./model.js";
 import { findTarget, type Project, projectLocales, reopenProject } from "./project.js";
 import { type EntryState, entryState } from "./status.js";
+import { buildUsageIndex, type Usage, type UsageIndex } from "./usage.js";
 import { checkTranslation, type Found } from "./validate.js";
 
 /** A message as translators see and return it: a string, plural forms, or array items. */
@@ -22,10 +23,14 @@ export interface BatchItem {
   comment?: string;
   /** Disambiguation context (gettext msgctxt). */
   context?: string;
-  /** Where the string is used in code. */
+  /** Where the string is used in code (gettext `#:` references when the code isn't found). */
   references?: string[];
+  /** Code that uses the string: the file says which screen, the code what role it plays. */
+  usage?: Usage[];
   /** The translation on disk now, for stale or untracked entries. */
   current?: MessageValue;
+  /** For stale entries: the source text `current` was translated from, when the lockfile knows it. */
+  previousSource?: MessageValue;
   /** Plural forms this locale needs, with sample counts for each. */
   pluralForms?: Array<{ form: string; examples: string; optional?: boolean }>;
   /** Placeholders the translation must keep. */
@@ -55,6 +60,8 @@ export interface BatchOptions {
   offset?: number;
   /** Entries to leave out, by {@link itemId}. */
   skip?: Set<string>;
+  /** Where strings are used in code; built when not given. false leaves it out. */
+  usages?: UsageIndex | false;
 }
 
 /** Identity of an entry in one locale, for tracking across batches. */
@@ -122,7 +129,8 @@ function buildMemory(project: Project, locales: string[]) {
 }
 
 /** The next entries needing translation, with everything a translator needs to do them well. */
-export function nextBatch(project: Project, opts: BatchOptions = {}): Batch {
+export async function nextBatch(project: Project, opts: BatchOptions = {}): Promise<Batch> {
+  const usages = opts.usages === undefined ? await buildUsageIndex(project) : opts.usages;
   const locales = opts.locales ?? projectLocales(project);
   const states = opts.states ?? DEFAULT_STATES;
   const limit = opts.limit ?? 40;
@@ -142,7 +150,8 @@ export function nextBatch(project: Project, opts: BatchOptions = {}): Batch {
         if (!src.translatable) continue;
         if (wanted && !wanted.has(src.key) && !wanted.has(displayKey(src.key))) continue;
         const tgt = catalog?.entries.get(src.key);
-        const state = entryState(src, tgt, getLockEntry(project.lock, target.id, locale, src.key));
+        const lockEntry = getLockEntry(project.lock, target.id, locale, src.key);
+        const state = entryState(src, tgt, lockEntry);
         if (!states.includes(state)) continue;
         if (opts.skip?.has(itemId({ target: target.id, locale, key: displayKey(src.key) })))
           continue;
@@ -170,8 +179,11 @@ export function nextBatch(project: Project, opts: BatchOptions = {}): Batch {
           source: toValue(src.message),
           ...(src.comment ? { comment: src.comment } : {}),
           ...(src.context ? { context: src.context } : {}),
-          ...(src.references?.length ? { references: src.references.slice(0, 3) } : {}),
+          ...usageFields(usages ? usages.find(target, src) : [], src.references),
           ...(tgt ? { current: toValue(tgt.message) } : {}),
+          ...(state === "stale" && lockEntry?.sourceText !== undefined
+            ? { previousSource: lockEntry.sourceText }
+            : {}),
           ...(src.message.kind === "plural" && spec
             ? {
                 pluralForms: spec.forms
@@ -229,6 +241,14 @@ export function nextBatch(project: Project, opts: BatchOptions = {}): Batch {
         .map((t) => [t.target.id, FORMAT_NOTES[t.target.format] ?? t.target.format]),
     ),
   };
+}
+
+function usageFields(
+  usage: Usage[],
+  references?: string[],
+): Pick<BatchItem, "usage" | "references"> {
+  if (usage.some((u) => u.code)) return { usage };
+  return references?.length ? { references: references.slice(0, 3) } : {};
 }
 
 export function languageName(locale: string): string {
@@ -539,6 +559,7 @@ async function record(
     const previous = getLockEntry(lock, k.target, k.locale, k.key);
     setLockEntry(lock, k.target, k.locale, k.key, {
       source: hashMessage(src.message),
+      sourceText: toValue(src.message),
       target: hashMessage(tgt.message),
       ...entry(previous),
     });
@@ -633,5 +654,147 @@ export async function approve(project: Project, opts: ApproveOptions = {}): Prom
     ...(previous?.model ? { model: previous.model } : {}),
   }));
   result.changed = result.changed.map((c) => ({ ...c, key: displayKey(c.key) }));
+  return result;
+}
+
+export interface RemoveOptions {
+  locales?: string[];
+  targets?: string[];
+  keys?: string[];
+  /** Which entries; at least one of keys or states is required. */
+  states?: EntryState[];
+  /** Also remove translations a person wrote, reviewed or approved. */
+  force?: boolean;
+  dryRun?: boolean;
+}
+
+export interface RemoveResult {
+  removed: Array<{ target: string; locale: string; key: string; from: EntryState }>;
+  refused: Array<{ target: string; locale: string; key: string; state: EntryState }>;
+  files: string[];
+  dryRun: boolean;
+}
+
+/** States `remove` may clear without `force`: the tool's own unreviewed work. */
+const DISPOSABLE: EntryState[] = ["draft", "stale"];
+
+/**
+ * Makes translations untranslated again, so they show up as missing and get redone. Use it
+ * to reject bad drafts. Never clears a person's work without `force`.
+ */
+export async function removeTranslations(
+  project: Project,
+  opts: RemoveOptions,
+): Promise<RemoveResult> {
+  if (!opts.keys?.length && !opts.states?.length) {
+    throw new UserError("Say which translations to remove: keys, states (e.g. draft), or both");
+  }
+  const locales = opts.locales ?? projectLocales(project);
+  const wanted = opts.keys ? new Set(opts.keys) : undefined;
+  const result: RemoveResult = { removed: [], refused: [], files: [], dryRun: !!opts.dryRun };
+  const plan = new Map<Target, Map<string, string[]>>();
+
+  for (const { target } of project.targets) {
+    if (opts.targets && !opts.targets.includes(target.id)) continue;
+    for (const locale of locales) {
+      const catalog = target.locales.get(locale);
+      if (!catalog) continue;
+      for (const src of target.source.entries.values()) {
+        if (wanted && !wanted.has(src.key) && !wanted.has(displayKey(src.key))) continue;
+        const tgt = catalog.entries.get(src.key);
+        if (!tgt) continue;
+        const state = entryState(src, tgt, getLockEntry(project.lock, target.id, locale, src.key));
+        if (opts.states && !opts.states.includes(state)) continue;
+        const at = { target: target.id, locale, key: displayKey(src.key) };
+        if (!opts.force && !DISPOSABLE.includes(state)) {
+          result.refused.push({ ...at, state });
+          continue;
+        }
+        result.removed.push({ ...at, from: state });
+        const byLocale = plan.get(target) ?? new Map<string, string[]>();
+        byLocale.set(locale, [...(byLocale.get(locale) ?? []), src.key]);
+        plan.set(target, byLocale);
+      }
+    }
+  }
+  if (opts.dryRun || plan.size === 0) return result;
+
+  const files = new Set<string>();
+  for (const [target, byLocale] of plan) {
+    for (const [locale, keys] of byLocale) {
+      for (const f of (await target.removeTranslations(locale, keys)).files) files.add(f);
+      for (const key of keys) delete project.lock.targets[target.id]?.[locale]?.[key];
+    }
+  }
+  result.files = [...files].sort();
+  await writeLock(project.fs, project.lockFile, project.lock);
+  return result;
+}
+
+export interface PruneResult {
+  removed: Array<{
+    target: string;
+    locale: string;
+    key: string;
+    reason: "orphan" | "not-translatable";
+  }>;
+  /** Lockfile records dropped for strings or targets that no longer exist. */
+  lockEntries: number;
+  files: string[];
+  dryRun: boolean;
+}
+
+/**
+ * Cleans up what source changes leave behind: translations of strings that were deleted or
+ * renamed, translations of strings now marked not translatable, and their lockfile records.
+ */
+export async function prune(
+  project: Project,
+  opts: { targets?: string[]; dryRun?: boolean } = {},
+): Promise<PruneResult> {
+  const result: PruneResult = { removed: [], lockEntries: 0, files: [], dryRun: !!opts.dryRun };
+  const plan = new Map<Target, Map<string, string[]>>();
+  for (const { target } of project.targets) {
+    if (opts.targets && !opts.targets.includes(target.id)) continue;
+    for (const [locale, catalog] of target.locales) {
+      for (const tgt of catalog.entries.values()) {
+        const src = target.source.entries.get(tgt.key);
+        const reason = !src
+          ? "orphan"
+          : !src.translatable && hashMessage(src.message) !== hashMessage(tgt.message)
+            ? "not-translatable"
+            : undefined;
+        if (!reason) continue;
+        result.removed.push({ target: target.id, locale, key: displayKey(tgt.key), reason });
+        const byLocale = plan.get(target) ?? new Map<string, string[]>();
+        byLocale.set(locale, [...(byLocale.get(locale) ?? []), tgt.key]);
+        plan.set(target, byLocale);
+      }
+    }
+  }
+
+  const lock = structuredClone(project.lock);
+  const count = (l: Lockfile) =>
+    Object.values(l.targets).reduce(
+      (n, byLocale) =>
+        n + Object.values(byLocale).reduce((m, keys) => m + Object.keys(keys).length, 0),
+      0,
+    );
+  const before = count(lock);
+  pruneLock(project, lock);
+  result.lockEntries = before - count(lock);
+  if (opts.dryRun) return result;
+
+  const files = new Set<string>();
+  for (const [target, byLocale] of plan) {
+    for (const [locale, keys] of byLocale) {
+      for (const f of (await target.removeTranslations(locale, keys)).files) files.add(f);
+    }
+  }
+  result.files = [...files].sort();
+  if (result.lockEntries > 0) {
+    await writeLock(project.fs, project.lockFile, lock);
+    project.lock = lock;
+  }
   return result;
 }

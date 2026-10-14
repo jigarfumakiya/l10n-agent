@@ -50,6 +50,12 @@ export interface Target {
   pluralSpec(locale: string): PluralSpec | undefined;
   /** Writes one locale. Entries absent from `catalog` are left as they are on disk. */
   writeLocale(catalog: Catalog): Promise<WriteResult>;
+  /**
+   * Makes these keys untranslated in one locale, the way the format spells it: Android drops
+   * the element, gettext empties `msgstr` (or drops the entry if the source no longer has it),
+   * String Catalogs drop the localization.
+   */
+  removeTranslations(locale: string, keys: string[]): Promise<WriteResult>;
 }
 
 export interface WriteResult {

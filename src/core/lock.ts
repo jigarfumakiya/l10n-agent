@@ -7,6 +7,11 @@ export type StoredState = "draft" | "reviewed" | "approved";
 export interface LockEntry {
   /** Hash of the source message the translation was made from. */
   source: string;
+  /**
+   * The source text itself, so a translator can see what changed when it goes stale.
+   * The hash decides staleness; this is only shown.
+   */
+  sourceText?: string | Record<string, string> | string[];
   /** Hash of the translation as the tool last wrote or approved it. */
   target: string;
   state: StoredState;

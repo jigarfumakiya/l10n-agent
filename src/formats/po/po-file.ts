@@ -134,6 +134,16 @@ export class PoFile {
     block.raw = undefined;
   }
 
+  /** Deletes an entry. The entry must come from {@link entries}. */
+  remove(entry: PoEntry): void {
+    const at = this.blocks.findIndex((b) => b.entry === entry);
+    if (at < 0) throw new Error("Entry is not part of this file");
+    const [removed] = this.blocks.splice(at, 1);
+    // The last entry's trailing blank lines (usually none) pass to the one before it.
+    const previous = this.blocks[at - 1];
+    if (at === this.blocks.length && previous && removed) previous.after = removed.after;
+  }
+
   add(entry: PoEntry): void {
     const last = this.blocks.at(-1);
     if (last && last.after.length === 0) last.after = [""];

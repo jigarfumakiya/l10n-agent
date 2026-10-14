@@ -37,7 +37,8 @@ installed, ask to install it once with `npm install -g github:jigarfumakiya/l10n
    - **Locale conventions:** punctuation, quotes, numbers and dates for that language.
 
 4. Fix problems by resubmitting the corrected text (drafts can be replaced):
-   `l10n submit fixes.json`. Leave correct ones alone.
+   `l10n submit fixes.json`. Leave correct ones alone. To throw a draft away so it gets
+   translated again from scratch: `l10n remove --locale hi --keys a,b`.
 
 5. Report to the user: what you changed and why, and anything you're unsure of (ambiguous
    source, missing context). Group by locale. If you can't judge a language well, say so.
