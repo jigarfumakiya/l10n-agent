@@ -1,11 +1,11 @@
 # l10n-agent — product and build plan
 
-> Working name. Local-first, agent-native localization for mobile apps.
+> Working name. Local-first, agent-native localization for apps.
 > **Your repo is the translation system. Your model is the translator.**
 
 The competitor analysis is in [RESEARCH.md](RESEARCH.md). This plan builds the
-open-source tool that fills the gap found there. StillMoney (Android + iOS) is the
-first user, and it must stay a user of the tool, not part of it.
+open-source tool that fills the gap found there. It is developed against real apps
+(dogfooding), which stay users of the tool and never become part of it.
 
 ---
 
@@ -34,7 +34,7 @@ part of it. We cover all of it, locally:
    site, UI role (button, title, accessibility label…), screen, nearby strings and a
    length budget. Cloud tools only get an app blurb and manual notes.
 3. **Extraction.** The agent makes the app localizable first, guided by a skill and
-   checked by the tool. Most indie apps, StillMoney included, start with hardcoded text.
+   checked by the tool. Most indie apps start with hardcoded text.
 4. **Lingo-grade quality, free and on disk.** Voice per locale, rules, glossary,
    model routing per locale, and an AI reviewer with scores and reports, all as files.
 5. **Visual QA in a closed loop.** Screenshots are rendered from Compose previews and
@@ -67,8 +67,8 @@ The details are in RESEARCH.md §3.
   and guarded by fingerprints.
 - **Native files, native formatting.** Output matches what Android Studio and Xcode
   write, so diffs stay small and reviewable.
-- **Nothing StillMoney-specific in the tool.** Anything StillMoney needs that's
-  general goes in as a feature; the rest stays in StillMoney's config.
+- **Nothing app-specific in the tool.** Anything an app needs that's general goes in
+  as a feature; the rest stays in that app's config.
 
 ## 4. Architecture
 
@@ -121,7 +121,7 @@ l10n.config.yaml
 ```
 
 ```yaml
-# l10n.config.yaml (StillMoney Android)
+# l10n.config.yaml (an Android app)
 sourceLocale: en
 locales: [hi, ar]
 targets:
@@ -327,54 +327,43 @@ memory:
   - `detect` and `init` (auto-detect formats, ask when unsure).
   - Then JSON and ARB.
   - Then String Catalog substitutions and device variations.
-  - Then P2 (agent loop).
+  - Then P4 (agent loop).
 
-Every phase ends with something usable, tried out on StillMoney. The day counts are
-rough focused-work estimates.
+Every phase ends with something usable and is tried out on real apps. The order changed
+on 2026-10-14: formats and detection come before the agent loop, so the tool works for
+any project first. Day counts are rough focused-work estimates.
 
-| Phase | Builds | StillMoney milestone | Est. |
+| Phase | Builds | Done when | Est. |
 |---|---|---|---|
-| **P0 Foundations** | Repo, CI, layout, fixture corpus (escaping, plurals ar/ja/ru/hi/uk, xliff, arrays, a real Xcode catalog) | — | 1d |
-| **P1 Android core** | model, android-xml read/write, checks, lock, `status` / `validate` / `pseudo` | `validate` runs on the Android repo | 3d |
-| **P2 Agent loop** | brief, voice, glossary, memory; `init`, `next-batch`, `submit`, drafts; skills `l10n-setup` + `l10n-translate` | Glossary and voice written for StillMoney | 3d |
-| **P3 Extraction (Android)** | `scan-code` (Kotlin), `add-source`, key naming, context v1 (usages, role, screen); skill `l10n-extract`; `en-XA` check | **All about 285 Android literals extracted**, one feature per commit | 5d |
-| **P4 iOS** | xcstrings adapter, Swift scanner, shared memory; catalog added through `project.yml` | **iOS extracted**, memory seeded from Android | 4d |
-| **P5 MCP + delegated** | MCP server (toolsets, prompts, resources); providers, routing, `translate` | Works in Claude Desktop and Cursor | 3d |
-| **P6 Quality** | AI reviewer, scores, review queue, static review page, XLIFF | **StillMoney ships its first locale** on both platforms | 4d |
-| **P7 CI** | GitHub Action (`validate`, `translate`, PR modes) | Both repos gate PRs on localization | 2d |
-| **— v0.1 public release —** | README quickstart, docs, `examples/` app, CONTRIBUTING, npm, `npx skills add`, MCP registry | | 3d |
-| **P8 Store** | fastlane adapter, limits, keyword adaptation, release notes | StillMoney store listings localized | 3d |
-| **P9 Visual** | capture hooks, id-marker mapping spike → mapping, truncation/RTL QA | Screenshot context in reviews | 6d |
-| **Later** | ARB, i18next/JSON, Compose Multiplatform, XLIFF-only projects, VS Code panel, remote MCP | | — |
+| **P0 Foundations** ✅ | Repo, CI, layout, fixtures | CI green | — |
+| **P1 Core + Android** ✅ | model, android-xml read/write, checks, lock reading, `status` / `validate` | 0 false errors on AndroidX resources | — |
+| **P1b Formats** ✅ | Pluggable placeholders and plural models, path patterns; gettext PO, Apple String Catalog | Byte-for-byte round trip on Django and real Xcode catalogs | — |
+| **P2 Detect + init** | `l10n detect` (candidates with evidence and confidence), `l10n init` (interactive, `--json`, `--yes`) | Finds the right targets in sample Android, iOS, Django and Flutter repos | 2d |
+| **P3 More formats** | JSON (flat, nested, i18next, ICU), Flutter ARB; String Catalog substitutions and device variations | Round trip on real files | 4d |
+| **P4 Agent loop** | Lockfile writes, brief, voice, glossary, memory; `next-batch`, `submit`, drafts; skills `l10n-setup` + `l10n-translate` | An agent translates a sample app to `hi` and `ar` with 0 errors | 3d |
+| **P5 Extraction** | `scan-code` (Kotlin, Swift), `add-source`, key naming, usage context; skill `l10n-extract`; pseudolocale check | A real app goes from hardcoded text to resources | 5d |
+| **P6 MCP + delegated** | MCP server (toolsets, prompts, resources); providers, routing, `translate` | Works in Claude Desktop and Cursor | 3d |
+| **P7 Quality** | AI reviewer, scores, review queue, static review page, XLIFF | A first locale ships in a real app | 4d |
+| **P8 CI** | GitHub Action (`validate`, `translate`, PR modes) | Pull requests are gated on localization | 2d |
+| **— v0.1 public release —** | Name check, docs, `examples/`, CONTRIBUTING, npm, `npx skills add`, MCP registry | | 3d |
+| **P9 Store** | fastlane adapter, limits, keyword adaptation, release notes | Store listings localized | 3d |
+| **P10 Visual** | capture hooks, id-marker mapping spike → mapping, truncation and RTL QA | Screenshot context in reviews | 6d |
+| **Later** | Apple `.strings`/`.stringsdict`, Compose Multiplatform, XLIFF projects, VS Code panel, remote MCP | | — |
 
-**Why release after P7:** by then the tool does the full loop that no free tool does:
-extract, translate, check, review and CI on both platforms. Store and visual QA follow
-in 0.2 and 0.3 and give more reasons to announce.
+**Why release after P8:** by then the tool does the full loop that no free tool does:
+detect, extract, translate, check, review and CI across formats. Store and visual QA
+follow in 0.2 and 0.3 and give more reasons to announce.
 
 ## 8. How we'll know it works
 
-- StillMoney: zero hardcoded UI strings (pseudolocale shows nothing missed), and
-  `validate` clean on both platforms.
+- A real app goes from hardcoded text to localized: zero hardcoded UI strings
+  (pseudolocale shows nothing missed), and `validate` clean on Android and iOS.
 - A new string in a PR is translated, checked and reviewed with no manual steps.
 - Cost per 1,000 strings per locale is measured and published in the README for a
   couple of model choices.
 - AI review agrees with a human spot-check on a sample. We publish how we measured.
 
-## 9. StillMoney notes and risks
-
-- **Category names:** categories are matched by family, then stored name, then icon.
-  Translated display names must not change that matching. Audit the category resolver
-  on both platforms before P3 touches category labels.
-- **Out of scope:** voice, import and category rules (`tools/*-rules`) read English
-  input; they aren't UI copy. Supporting another input language is its own project.
-- **Lume and streak copy** carry the app's personality. They need strong voice notes,
-  and Lume's voice gets human review per locale.
-- **Prices** come from the store and are formatted, never translated. Badges and
-  paywall copy get high review priority.
-- **Changing many files:** P3 and P4 touch 40 or more files in each app. Work on main,
-  with one commit per feature area.
-
-## 10. Risks for the tool
+## 9. Risks for the tool
 
 - **Writer fidelity** (Xcode JSON, Android XML comments and order) is what earns
   trust. Golden fixtures from real IDEs, and property tests on round trips.
@@ -385,15 +374,15 @@ in 0.2 and 0.3 and give more reasons to announce.
 - **Scope creep:** the order is mobile first, then web formats, and only when someone
   contributes them.
 
-## 11. Decisions
+## 10. Decisions
 
 Decided 2026-10-14:
 1. **Name:** `l10n-agent` for now. Check for collisions before the public release.
 2. **License:** MIT.
-3. **First StillMoney locales:** `hi` (Devanagari, two plural forms, text grows long)
-   and `ar` (right to left, all six plural forms). Together they test layout and
-   plurals as hard as any pair can.
+3. **First test locales:** `hi` (Devanagari, two plural forms, text grows long) and
+   `ar` (right to left, all six plural forms). Together they test layout and plurals
+   as hard as any pair can.
 
 Still open:
 4. **Visual QA scope for v0.1.** Ship the pseudolocale check only, and leave the full
-   mapping for P9.
+   mapping for P10.

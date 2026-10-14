@@ -24,6 +24,8 @@ describe("config", () => {
   });
 
   it("says how to start when there is no config", async () => {
-    await expect(loadConfig(memoryFs({ "/x/a": "" }), "/x")).rejects.toThrow(/l10n init/);
+    await expect(loadConfig(memoryFs({ "/x/a": "" }), "/x")).rejects.toThrow(
+      /No l10n\.config\.yaml found[\s\S]*#quick-start/,
+    );
   });
 });

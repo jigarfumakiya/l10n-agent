@@ -11,7 +11,8 @@ declare const __VERSION__: string | undefined;
 const program = new Command()
   .name("l10n")
   .description("Local-first, agent-native localization for apps")
-  .version(typeof __VERSION__ === "string" ? __VERSION__ : "0.0.0")
+  // Filled in by the build; `npm run dev` runs unbundled source.
+  .version(typeof __VERSION__ === "string" ? __VERSION__ : "dev")
   .option("-c, --config <file>", "path to l10n.config.yaml (default: nearest one)")
   .option("-C, --cwd <dir>", "directory to run in", process.cwd());
 

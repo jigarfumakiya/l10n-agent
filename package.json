@@ -8,8 +8,7 @@
     "l10n": "./dist/cli.js"
   },
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "engines": {
     "node": ">=22"
