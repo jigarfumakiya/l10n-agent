@@ -127,7 +127,7 @@ function checkSource(target: Target, src: Entry): Found[] {
     const a = target.analyze(value, src);
     for (const l of a.lints) out.push({ ...l, ...(form ? { form } : {}) });
     const loose = a.placeholders.filter((p) => !p.positional);
-    if (loose.length > 1) {
+    if (loose.length > 1 && !target.translationsMayReorder) {
       const printf = loose.every((p) => p.raw.startsWith("%") && p.type);
       out.push({
         severity: "warning",
@@ -164,8 +164,12 @@ function checkTranslation(
   locale: string,
   sourceLocale: string,
 ): Found[] {
-  const s = src.message;
   const t = tgt.message;
+  // A String Catalog may vary a translation by plural even when the source doesn't.
+  const s =
+    src.message.kind === "text" && t.kind === "plural"
+      ? { kind: "plural" as const, forms: { other: src.message.value } }
+      : src.message;
   if (s.kind !== t.kind) {
     return [
       {
@@ -177,10 +181,17 @@ function checkTranslation(
   }
   const sameLanguage = locale.split("-")[0] === sourceLocale.split("-")[0];
   // Both sides are read with the source entry's metadata (format flags, `formatted`).
-  const compare = (sv: string, tv: string, form?: string, countImplied = false) =>
+  const compare = (
+    sv: string,
+    tv: string,
+    form?: string,
+    countImplied = false,
+    allowed?: Set<string>,
+  ) =>
     compareValues(target.analyze(sv, src), target.analyze(tv, src), {
       countImplied,
       sameLanguage,
+      allowed,
     }).map((f) => (form ? { ...f, form } : f));
 
   if (s.kind === "text" && t.kind === "text") return compare(s.value, t.value);
@@ -214,19 +225,40 @@ function checkTranslation(
         : `${id} (n = ${f.examples})`;
     };
     if (spec) {
-      const required = spec.forms.map((f) => f.id);
-      const missing = required.filter((id) => t.forms[id] === undefined);
-      if (missing.length > 0) {
+      const known = spec.forms.map((f) => f.id);
+      const required = spec.forms.filter((f) => !f.optional);
+      const missing = required.filter((f) => t.forms[f.id] === undefined);
+      // gettext needs every form (msgfmt rejects the file). CLDR formats fall back to
+      // `other` at runtime, so only a missing `other` breaks; the rest read awkwardly.
+      const breaking = missing.filter((f) => spec.scheme === "gettext" || f.id === "other");
+      const fallback = missing.filter((f) => !breaking.includes(f) && !f.decimalOnly);
+      const fractional = missing.filter((f) => !breaking.includes(f) && f.decimalOnly);
+      const needs = `${locale} needs ${required.length} plural forms (${spec.source})`;
+      if (breaking.length) {
         out.push({
           severity: "error",
           code: "plural-missing-category",
-          message: `${locale} needs ${required.length} plural forms (${spec.source}); missing ${missing.map(label).join(", ")}`,
+          message: `${needs}; missing ${breaking.map((f) => label(f.id)).join(", ")}`,
+        });
+      }
+      if (fallback.length) {
+        out.push({
+          severity: "warning",
+          code: "plural-missing-category",
+          message: `${needs}; missing ${fallback.map((f) => label(f.id)).join(", ")}, which will show the "other" form`,
+        });
+      }
+      if (fractional.length) {
+        out.push({
+          severity: "warning",
+          code: "plural-missing-category",
+          message: `Missing ${fractional.map((f) => label(f.id)).join(", ")}, used only for fractional counts`,
         });
       }
       for (const id of Object.keys(t.forms)) {
-        if (required.includes(id)) continue;
+        if (known.includes(id)) continue;
         out.push({
-          // msgfmt rejects extra gettext forms; Android just never uses an extra category.
+          // msgfmt rejects extra gettext forms; Android and iOS just never use an extra category.
           severity: spec.scheme === "gettext" ? "error" : "warning",
           code: "plural-extra-category",
           message:
@@ -237,10 +269,15 @@ function checkTranslation(
         });
       }
     }
+    // Any placeholder some source form uses may appear in any translated form: English
+    // "one match" drops the count, but Russian `one` also covers 21, 31… and needs it.
+    const allowed = new Set(
+      Object.values(s.forms).flatMap((v) => target.analyze(v, src).placeholders.map((p) => p.id)),
+    );
     for (const [id, tv] of Object.entries(t.forms)) {
       const countImplied = spec?.forms.find((f) => f.id === id)?.countImplied ?? false;
       const sv = s.forms[id] ?? (countImplied ? singular : pluralValue);
-      if (sv !== undefined) out.push(...compare(sv, tv, id, countImplied));
+      if (sv !== undefined) out.push(...compare(sv, tv, id, countImplied, allowed));
     }
     return out;
   }
@@ -250,7 +287,7 @@ function checkTranslation(
 export function compareValues(
   s: ValueAnalysis,
   t: ValueAnalysis,
-  opts: { countImplied?: boolean; sameLanguage?: boolean } = {},
+  opts: { countImplied?: boolean; sameLanguage?: boolean; allowed?: Set<string> } = {},
 ): Found[] {
   const out: Found[] = [...t.lints];
 
@@ -273,7 +310,7 @@ export function compareValues(
     }
   }
   for (const [i, p] of tp) {
-    if (!sp.has(i))
+    if (!sp.has(i) && !opts.allowed?.has(i))
       out.push({
         severity: "error",
         code: "placeholder-extra",

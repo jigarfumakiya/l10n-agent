@@ -7,6 +7,7 @@ import type { Placeholder } from "./model.js";
 export const PLACEHOLDER_SYNTAXES = [
   "java", // java.util.Formatter, as used by Android: %s %1$s %.2f
   "c", // C printf, also PHP and JavaScript sprintf: %s %1$s %lu %zu
+  "apple", // Foundation String(format:): %@ %lld %1$@, and %#@name@ substitutions
   "python", // Python %-formatting: %(name)s %s
   "python-brace", // str.format: {name} {0} {}
   "java-message", // java.text.MessageFormat: {0} {1,number}
@@ -23,6 +24,14 @@ export function findPlaceholders(text: string, syntax: PlaceholderSyntax): Place
       return printf(text, JAVA);
     case "c":
       return printf(text, C);
+    case "apple": {
+      const subs = [...text.matchAll(/%#@([A-Za-z_]\w*)@/g)].map((m) => ({
+        id: `@${m[1]}`,
+        raw: m[0],
+        positional: true,
+      }));
+      return [...subs, ...printf(text.replace(/%#@[A-Za-z_]\w*@/g, ""), APPLE)];
+    }
     case "python":
       return python(text);
     case "python-brace":
@@ -60,6 +69,9 @@ const JAVA = /%(?:(\d+)\$)?([-#+ 0,(<]*)(\d+)?(?:\.\d+)?([tT][a-zA-Z]|[a-zA-Z%])
 const C =
   /%(?:(\d+)\$)?([-#+ 0']*)(\d+|\*)?(?:\.(?:\d+|\*))?(hh|h|ll|l|L|q|j|z|Z|t|I64|I32|I)?([diouxXeEfFgGaAcspn%])/g;
 
+const APPLE =
+  /%(?:(\d+)\$)?([-#+ 0']*)(\d+|\*)?(?:\.(?:\d+|\*))?(hh|h|ll|l|q|L|z|t|j)?([@diouxXeEfFgGaAcCsSp%])/g;
+
 /** Length modifiers don't change what the argument is: `%lu` and `%u` both take an unsigned number. */
 function printf(text: string, re: RegExp): Placeholder[] {
   const found: Placeholder[] = [];
@@ -68,7 +80,7 @@ function printf(text: string, re: RegExp): Placeholder[] {
     const raw = m[0];
     const index = m[1];
     const flags = m[2] ?? "";
-    const conv = (re === C ? m[5] : m[4]) ?? "";
+    const conv = (re === JAVA ? m[4] : m[5]) ?? "";
     if (conv === "%" || conv === "n") continue;
     // "50% off" reads as `% o` with a space flag; treat as prose.
     if (flags.includes(" ")) continue;

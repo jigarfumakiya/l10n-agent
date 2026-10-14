@@ -23,6 +23,7 @@ export function cldrPluralSpec(locale: string): PluralSpec {
         id,
         examples: describeSamples(ints, decimals),
         countImplied: ints.length === 1 && decimals.length === 0,
+        ...(ints.length === 0 ? { decimalOnly: true } : {}),
       };
     }),
   };

@@ -311,9 +311,22 @@ memory:
   - Tested on Django admin's real files in 11 languages: every file round-trips byte for
     byte. It found a real Irish placeholder bug that `msgfmt --check` misses.
   - 105 tests pass.
+- **Apple String Catalog (`.xcstrings`) done (2026-10-14):**
+  - Order-preserving JSON that re-renders only the path to a change.
+  - Tested on 9 real catalogs (CotEditor, WordPress, Blankie and others): every one
+    round-trips byte for byte, and a full re-render from scratch matches what Xcode writes.
+  - Apple placeholders, plural variations with Apple's optional `zero`, and
+    `needs_review` counted as a draft.
+  - Device variations and substitutions are skipped for now.
+- **Plural checks refined across formats:**
+  - Extra placeholders are allowed if any source form uses them.
+  - A missing form is a warning when the app falls back to `other`, or when the form is
+    only used for fractions.
+  - 115 tests pass.
 - **Next:**
   - `detect` and `init` (auto-detect formats, ask when unsure).
-  - Then JSON, ARB and xcstrings.
+  - Then JSON and ARB.
+  - Then String Catalog substitutions and device variations.
   - Then P2 (agent loop).
 
 Every phase ends with something usable, tried out on StillMoney. The day counts are

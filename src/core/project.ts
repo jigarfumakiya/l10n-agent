@@ -2,6 +2,7 @@ import path from "node:path";
 import { androidAdapter } from "../formats/android/adapter.js";
 import { poAdapter } from "../formats/po/adapter.js";
 import type { FormatAdapter, Target } from "../formats/types.js";
+import { xcstringsAdapter } from "../formats/xcstrings/adapter.js";
 import { type Config, loadConfig, type TargetConfig, targetId } from "./config.js";
 import type { FileSystem } from "./fs.js";
 import { type Lockfile, readLock } from "./lock.js";
@@ -11,6 +12,7 @@ const ADAPTERS: {
 } = {
   "android-xml": androidAdapter,
   po: poAdapter,
+  xcstrings: xcstringsAdapter,
 };
 
 export interface ProjectTarget {

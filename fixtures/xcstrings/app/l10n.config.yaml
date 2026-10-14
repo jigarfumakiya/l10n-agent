@@ -1,0 +1,4 @@
+locales: [hi, ar]
+targets:
+  - format: xcstrings
+    path: App/Localizable.xcstrings

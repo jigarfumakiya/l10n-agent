@@ -21,7 +21,7 @@ describe("validate", async () => {
         "warning ar app_name not-translatable",
         "error ar greeting placeholder-type",
         "error ar quote escape-apostrophe",
-        "error ar days_left plural-missing-category",
+        "warning ar days_left plural-missing-category",
         "warning ar days_left[one] placeholder-missing",
         "warning ar old_key orphan",
       ].sort(),

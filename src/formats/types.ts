@@ -23,6 +23,11 @@ export interface Target {
   readonly locales: Map<string, Catalog>;
   /** File-level problems: parse errors, duplicate keys, broken headers. */
   readonly issues: Issue[];
+  /**
+   * Translations may number unnumbered source placeholders themselves (Apple: `%@` → `%1$@`),
+   * so the source needn't. Xcode generates source keys from code, where they can't be numbered.
+   */
+  readonly translationsMayReorder?: boolean;
   /** Resolves a raw value so generic checks can compare source and translation. */
   analyze(value: string, entry: Entry): ValueAnalysis;
   /** Plural forms this locale needs in this format; undefined when it can't be known. */

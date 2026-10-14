@@ -97,6 +97,10 @@ export interface PluralFormSpec {
   examples: string;
   /** Only ever one number (like 1), so the form may spell it out instead of using a placeholder. */
   countImplied: boolean;
+  /** Allowed but never required (Apple's `zero`, usable in any language). */
+  optional?: boolean;
+  /** Only fractional counts select it (Czech `many`), so integer counts never reach it. */
+  decimalOnly?: boolean;
 }
 
 /** Plural form keys in their natural order: CLDR order, then numeric. */

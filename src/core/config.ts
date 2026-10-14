@@ -37,12 +37,29 @@ const PoTargetSchema = z.object({
   pluralForms: z.record(z.string(), z.string()).optional(),
 });
 
+const XcstringsTargetSchema = z.object({
+  id,
+  format: z.literal("xcstrings"),
+  path: z
+    .string()
+    .refine(
+      (p) => p.endsWith(".xcstrings"),
+      "Point at a .xcstrings file (all languages live in it)",
+    ),
+});
+
 export const ConfigSchema = z
   .object({
     sourceLocale: locale.default("en"),
     locales: z.array(locale).default([]),
     targets: z
-      .array(z.discriminatedUnion("format", [AndroidTargetSchema, PoTargetSchema]))
+      .array(
+        z.discriminatedUnion("format", [
+          AndroidTargetSchema,
+          PoTargetSchema,
+          XcstringsTargetSchema,
+        ]),
+      )
       .min(1, "Add at least one target"),
     lock: z.string().default(".l10n/lock.json"),
   })
