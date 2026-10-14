@@ -1,21 +1,32 @@
+import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Command, InvalidArgumentError } from "commander";
 import { UserError } from "../core/errors.js";
 import { nodeFs } from "../core/fs.js";
 import { openProject } from "../core/project.js";
-import { computeStatus } from "../core/status.js";
+import { computeStatus, ENTRY_STATES, type EntryState } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
+import { approve, nextBatch, parseSubmitInput, submit } from "../core/workflow.js";
 import { detect } from "../detect/detect.js";
+import { translateProject } from "../translate/translate.js";
 import { runInit } from "./init-command.js";
-import { describeDetect, describeNone, printIssues, printStatus } from "./output.js";
+import {
+  describeDetect,
+  describeNone,
+  printApprove,
+  printIssues,
+  printStatus,
+  printSubmit,
+} from "./output.js";
 
 declare const __VERSION__: string | undefined;
+const VERSION = typeof __VERSION__ === "string" ? __VERSION__ : "dev";
 
 const program = new Command()
   .name("l10n")
   .description("Local-first, agent-native localization for apps")
   // Filled in by the build; `npm run dev` runs unbundled source.
-  .version(typeof __VERSION__ === "string" ? __VERSION__ : "dev")
+  .version(VERSION)
   .option("-c, --config <file>", "path to l10n.config.yaml (default: nearest one)")
   .option("-C, --cwd <dir>", "directory to run in", process.cwd());
 
@@ -25,6 +36,29 @@ const locales = (v: string) =>
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+
+const list = locales;
+const states = (v: string) => {
+  const out = list(v);
+  const bad = out.filter((s) => !ENTRY_STATES.includes(s as EntryState));
+  if (bad.length) {
+    throw new InvalidArgumentError(
+      `Unknown state ${bad.join(", ")}; use ${ENTRY_STATES.join(", ")}`,
+    );
+  }
+  return out as EntryState[];
+};
+const count = (v: string) => {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0) throw new InvalidArgumentError("Use a whole number");
+  return n;
+};
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 program
   .command("status")
@@ -75,6 +109,169 @@ program
       for (const line of describeDetect(result)) console.log(line);
       console.log("\nNext: `l10n init` writes these into l10n.config.yaml.");
     }
+  });
+
+program
+  .command("next-batch")
+  .description("Strings that need translating, with context, as JSON for an agent")
+  .option("-l, --locale <list>", "comma-separated locales", locales)
+  .option("-t, --target <list>", "only these target ids", list)
+  .option("-k, --keys <list>", "only these keys", list)
+  .option("--states <list>", "which entries (default: missing,stale)", states)
+  .option("-n, --limit <n>", "entries per batch", count, 40)
+  .option("--offset <n>", "skip this many entries", count, 0)
+  .action(
+    async (opts: {
+      locale?: string[];
+      target?: string[];
+      keys?: string[];
+      states?: EntryState[];
+      limit: number;
+      offset: number;
+    }) => {
+      const project = await openProject(nodeFs, globals());
+      const batch = nextBatch(project, {
+        locales: opts.locale,
+        targets: opts.target,
+        keys: opts.keys,
+        states: opts.states,
+        limit: opts.limit,
+        offset: opts.offset,
+      });
+      console.log(JSON.stringify(batch, null, 2));
+    },
+  );
+
+program
+  .command("submit")
+  .description("Check translations and write the good ones as drafts; exits 1 if any are rejected")
+  .argument(
+    "[file]",
+    'JSON file, or - for stdin: {"translations": [{"locale", "key", "value"}]}',
+    "-",
+  )
+  .option("-m, --model <name>", "model that made the translations, kept in the lockfile")
+  .option("--force", "replace hand edits and reviewed or approved translations")
+  .option("--dry-run", "check without writing")
+  .option("--json", "machine-readable output")
+  .action(
+    async (
+      file: string,
+      opts: { model?: string; force?: boolean; dryRun?: boolean; json?: boolean },
+    ) => {
+      const g = globals();
+      const text =
+        file === "-" ? await readStdin() : await nodeFs.readFile(path.resolve(g.cwd, file));
+      const input = parseSubmitInput(text);
+      const project = await openProject(nodeFs, g);
+      const result = await submit(project, input.translations, {
+        model: opts.model ?? input.model,
+        force: opts.force,
+        dryRun: opts.dryRun,
+      });
+      if (opts.json) console.log(JSON.stringify(result, null, 2));
+      else printSubmit(result);
+      process.exitCode = result.rejected.length > 0 ? 1 : 0;
+    },
+  );
+
+program
+  .command("approve")
+  .description("Mark drafts approved (or reviewed)")
+  .option("-l, --locale <list>", "comma-separated locales", locales)
+  .option("-t, --target <list>", "only these target ids", list)
+  .option("-k, --keys <list>", "only these keys", list)
+  .option(
+    "--from <list>",
+    "which entries (default: draft,reviewed). Add untracked to adopt existing translations, edited to accept hand edits",
+    states,
+  )
+  .option("--reviewed", "mark reviewed instead of approved")
+  .option("--dry-run", "show what would change")
+  .option("--json", "machine-readable output")
+  .action(
+    async (opts: {
+      locale?: string[];
+      target?: string[];
+      keys?: string[];
+      from?: EntryState[];
+      reviewed?: boolean;
+      dryRun?: boolean;
+      json?: boolean;
+    }) => {
+      const project = await openProject(nodeFs, globals());
+      const to = opts.reviewed ? "reviewed" : "approved";
+      const result = await approve(project, {
+        locales: opts.locale,
+        targets: opts.target,
+        keys: opts.keys,
+        states: opts.from,
+        to,
+        dryRun: opts.dryRun,
+      });
+      if (opts.json) console.log(JSON.stringify(result, null, 2));
+      else printApprove(result, to);
+    },
+  );
+
+program
+  .command("translate")
+  .description("Translate missing and stale strings with a model API, as drafts")
+  .option("-l, --locale <list>", "comma-separated locales", locales)
+  .option("-t, --target <list>", "only these target ids", list)
+  .option("-k, --keys <list>", "only these keys", list)
+  .option("--states <list>", "which entries (default: missing,stale)", states)
+  .option("-m, --model <provider:model>", "model for every locale (default: models in the config)")
+  .option("-n, --batch-size <n>", "strings per model call", count, 30)
+  .option("-p, --parallel <n>", "model calls at once", count, 4)
+  .option("--force", "replace hand edits and reviewed or approved translations")
+  .option("--json", "machine-readable output")
+  .action(
+    async (opts: {
+      locale?: string[];
+      target?: string[];
+      keys?: string[];
+      states?: EntryState[];
+      model?: string;
+      batchSize: number;
+      parallel: number;
+      force?: boolean;
+      json?: boolean;
+    }) => {
+      const project = await openProject(nodeFs, globals());
+      const result = await translateProject(project, {
+        locales: opts.locale,
+        targets: opts.target,
+        keys: opts.keys,
+        states: opts.states,
+        model: opts.model,
+        batchSize: opts.batchSize,
+        concurrency: opts.parallel,
+        force: opts.force,
+        log: (line) => console.error(line),
+      });
+      if (opts.json) {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(`${result.translated} strings translated as drafts.`);
+        for (const f of result.failed) {
+          console.log(`  ✖ ${f.locale} ${f.key}: ${f.errors.join("; ")}`);
+        }
+        for (const f of result.files) console.log(`  ${f}`);
+        if (result.translated > 0) {
+          console.log("Next: `l10n validate`, review the drafts, then `l10n approve`.");
+        }
+      }
+      process.exitCode = result.failed.length > 0 ? 1 : 0;
+    },
+  );
+
+program
+  .command("mcp")
+  .description("Run the MCP server over stdio, for Claude, Cursor, Codex and other MCP clients")
+  .action(async () => {
+    const { runServer } = await import("../mcp/server.js");
+    await runServer({ cwd: globals().cwd, version: VERSION });
   });
 
 const setupNumbers = (v: string) => {

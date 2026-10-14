@@ -24,7 +24,7 @@ describe("android adapter", () => {
     ]);
     const home = t?.source.entries.get("home_title");
     expect(home?.comment).toBe("Home title. Shown at the top of the main screen.");
-    expect(home?.file).toBe(path.join("res", "values", "strings.xml"));
+    expect(home?.file).toBe("res/values/strings.xml");
     expect(home?.line).toBe(6);
     expect(t?.source.entries.get("app_name")?.translatable).toBe(false);
     expect(t?.source.entries.get("days_left")?.message).toEqual({

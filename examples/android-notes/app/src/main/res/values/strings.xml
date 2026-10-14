@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Jotter</string>
+
+    <!-- Home screen -->
+    <string name="home_title">Your notes</string>
+    <!-- Shown when the user has no notes yet -->
+    <string name="home_empty">Nothing here yet. Tap + to write your first note.</string>
+    <!-- Search field hint -->
+    <string name="search_hint">Search notes</string>
+    <plurals name="notes_count">
+        <item quantity="one">%d note</item>
+        <item quantity="other">%d notes</item>
+    </plurals>
+
+    <!-- Editor -->
+    <string name="editor_title_hint">Title</string>
+    <string name="editor_body_hint">Start writing…</string>
+    <!-- Button: saves the note and closes the editor -->
+    <string name="action_save">Save</string>
+    <!-- Button: discards unsaved changes -->
+    <string name="action_discard">Discard</string>
+    <string name="discard_confirm">Discard changes? You can\'t undo this.</string>
+    <!-- %1$s is the time the note was last edited, e.g. "5 min ago" -->
+    <string name="edited_at">Edited %1$s</string>
+
+    <!-- Sharing -->
+    <!-- %1$s is the note title, %2$s is the app name -->
+    <string name="share_subject">%1$s, shared from %2$s</string>
+
+    <!-- Trash -->
+    <plurals name="trash_deleted">
+        <item quantity="one">Moved %d note to the trash</item>
+        <item quantity="other">Moved %d notes to the trash</item>
+    </plurals>
+    <string name="action_undo">Undo</string>
+    <!-- Explains automatic emptying of the trash -->
+    <string name="trash_info">Notes in the trash are deleted for good after <b>30 days</b>.</string>
+
+    <!-- Sync -->
+    <string name="sync_off">Sync is off. Your notes stay on this device.</string>
+    <!-- %1$s is an email address -->
+    <string name="sync_signed_in">Syncing as <xliff:g id="email" example="sam@example.com">%1$s</xliff:g></string>
+    <string name="sync_pro">Sync across devices with Jotter Pro</string>
+
+    <!-- Sort options in the menu, in this order -->
+    <string-array name="sort_options">
+        <item>Last edited</item>
+        <item>Date created</item>
+        <item>Title</item>
+    </string-array>
+</resources>

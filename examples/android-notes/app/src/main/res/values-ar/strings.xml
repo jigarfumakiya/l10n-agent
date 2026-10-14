@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="home_title">ملاحظاتك</string>
+    <string name="home_empty">لا شيء هنا بعد. انقر على + لكتابة أول ملاحظة.</string>
+    <string name="search_hint">ابحث في الملاحظات</string>
+    <plurals name="notes_count">
+        <item quantity="zero">لا توجد ملاحظات</item>
+        <item quantity="one">ملاحظة واحدة</item>
+        <item quantity="two">ملاحظتان</item>
+        <item quantity="few">%d ملاحظات</item>
+        <item quantity="many">%d ملاحظة</item>
+        <item quantity="other">%d ملاحظة</item>
+    </plurals>
+    <string name="editor_title_hint">العنوان</string>
+    <string name="editor_body_hint">ابدأ الكتابة…</string>
+    <string name="action_save">حفظ</string>
+    <string name="action_discard">تجاهل</string>
+    <string name="discard_confirm">هل تريد تجاهل التغييرات؟ لا يمكن التراجع عن ذلك.</string>
+    <string name="edited_at">عُدّلت %1$s</string>
+    <string name="share_subject">%1$s، تمت مشاركتها من %2$s</string>
+    <plurals name="trash_deleted">
+        <item quantity="zero">لم يتم نقل أي ملاحظة إلى سلة المهملات</item>
+        <item quantity="one">تم نقل ملاحظة واحدة إلى سلة المهملات</item>
+        <item quantity="two">تم نقل ملاحظتين إلى سلة المهملات</item>
+        <item quantity="few">تم نقل %d ملاحظات إلى سلة المهملات</item>
+        <item quantity="many">تم نقل %d ملاحظة إلى سلة المهملات</item>
+        <item quantity="other">تم نقل %d ملاحظة إلى سلة المهملات</item>
+    </plurals>
+    <string name="action_undo">تراجع</string>
+    <string name="trash_info">تُحذف الملاحظات الموجودة في سلة المهملات نهائيًا بعد <b>30 يومًا</b>.</string>
+    <string name="sync_off">المزامنة متوقفة. تبقى ملاحظاتك على هذا الجهاز.</string>
+    <string name="sync_signed_in">تتم المزامنة باسم <xliff:g id="email" example="sam@example.com">%1$s</xliff:g></string>
+    <string name="sync_pro">زامن ملاحظاتك عبر أجهزتك مع Jotter Pro</string>
+    <string-array name="sort_options">
+        <item>آخر تعديل</item>
+        <item>تاريخ الإنشاء</item>
+        <item>العنوان</item>
+    </string-array>
+</resources>

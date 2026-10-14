@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="home_title">आपके नोट्स</string>
+    <string name="home_empty">अभी यहाँ कुछ नहीं है। अपना पहला नोट लिखने के लिए + पर टैप करें।</string>
+    <string name="search_hint">नोट्स खोजें</string>
+    <plurals name="notes_count">
+        <item quantity="one">%d नोट</item>
+        <item quantity="other">%d नोट्स</item>
+    </plurals>
+    <string name="editor_title_hint">शीर्षक</string>
+    <string name="editor_body_hint">लिखना शुरू करें…</string>
+    <string name="action_save">सेव करें</string>
+    <string name="action_discard">हटाएँ</string>
+    <string name="discard_confirm">बदलाव हटाने हैं? इसे वापस नहीं लाया जा सकता।</string>
+    <string name="edited_at">%1$s बदला गया</string>
+    <string name="share_subject">%1$s, %2$s से शेयर किया गया</string>
+    <plurals name="trash_deleted">
+        <item quantity="one">%d नोट ट्रैश में भेजा गया</item>
+        <item quantity="other">%d नोट्स ट्रैश में भेजे गए</item>
+    </plurals>
+    <string name="action_undo">वापस लें</string>
+    <string name="trash_info">ट्रैश में रखे नोट्स <b>30 दिन</b> बाद हमेशा के लिए मिट जाते हैं।</string>
+    <string name="sync_off">Sync बंद है। आपके नोट्स इसी डिवाइस पर रहते हैं।</string>
+    <string name="sync_signed_in"><xliff:g id="email" example="sam@example.com">%1$s</xliff:g> के रूप में sync हो रहा है</string>
+    <string name="sync_pro">Jotter Pro के साथ सभी डिवाइस पर sync करें</string>
+    <string-array name="sort_options">
+        <item>आखिरी बदलाव</item>
+        <item>बनाने की तारीख</item>
+        <item>शीर्षक</item>
+    </string-array>
+</resources>

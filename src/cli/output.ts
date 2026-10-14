@@ -1,6 +1,7 @@
 import { displayKey, type Issue } from "../core/model.js";
 import type { Project } from "../core/project.js";
 import { ENTRY_STATES, type LocaleStatus } from "../core/status.js";
+import type { ApproveResult, SubmitResult } from "../core/workflow.js";
 import type { DetectResult } from "../detect/detect.js";
 
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -53,6 +54,10 @@ export function printStatus(project: Project, status: LocaleStatus[]): void {
   }
 }
 
+const INFO_NOTES: Record<string, string> = {
+  "placeholder-implied": "plural forms spell out their only number instead of a placeholder",
+};
+
 export function printIssues(issues: Issue[]): void {
   const shown = issues.filter((i) => i.severity !== "info");
   const infos = issues.filter((i) => i.severity === "info");
@@ -63,8 +68,16 @@ export function printIssues(issues: Issue[]): void {
     const loc = i.file ? dim(` ${i.file}${i.line ? `:${i.line}` : ""}`) : "";
     console.log(`${mark} ${bold(where)} ${dim(i.code)} ${i.message}${loc}`);
   }
-  for (const i of infos)
+  // Locale-level notes print as they are; notes about single strings are counted.
+  for (const i of infos.filter((x) => x.key === undefined))
     console.log(`${dim("·")} ${i.locale ? `${i.locale} ` : ""}${dim(i.message)}`);
+  const perString = new Map<string, number>();
+  for (const i of infos)
+    if (i.key !== undefined) perString.set(i.code, (perString.get(i.code) ?? 0) + 1);
+  for (const [code, n] of perString) {
+    const note = INFO_NOTES[code] ?? code;
+    console.log(dim(`· ${n} ${note} (--json lists them)`));
+  }
   const errors = shown.filter((i) => i.severity === "error").length;
   const warnings = shown.length - errors;
   const summary = `${errors} error${errors === 1 ? "" : "s"}, ${warnings} warning${warnings === 1 ? "" : "s"}`;
@@ -161,4 +174,38 @@ export function describeNone(result: DetectResult): string[] {
     ),
   );
   return lines;
+}
+
+export function printSubmit(r: SubmitResult): void {
+  const verb = r.dryRun ? "would be written" : "written as drafts";
+  console.log(
+    `${green(String(r.accepted.length))} ${verb}, ${r.rejected.length ? red(String(r.rejected.length)) : "0"} rejected`,
+  );
+  for (const a of r.accepted) {
+    for (const w of a.warnings) {
+      console.log(
+        `  ${yellow("▲")} ${a.locale} ${a.key}${w.form ? ` [${w.form}]` : ""}: ${w.message}`,
+      );
+    }
+  }
+  for (const x of r.rejected) {
+    for (const e of x.errors) {
+      console.log(
+        `  ${red("✖")} ${x.locale} ${x.key}${e.form ? ` [${e.form}]` : ""}: ${e.message}`,
+      );
+    }
+  }
+  for (const f of r.files) console.log(dim(`  ${f}`));
+}
+
+export function printApprove(r: ApproveResult, to: string): void {
+  if (r.changed.length === 0) {
+    console.log("Nothing to change.");
+    return;
+  }
+  const counts = new Map<string, number>();
+  for (const c of r.changed) counts.set(c.locale, (counts.get(c.locale) ?? 0) + 1);
+  const each = [...counts].map(([l, n]) => `${l} ${n}`).join(", ");
+  console.log(`${r.dryRun ? "Would mark" : "Marked"} ${r.changed.length} ${to} (${each})`);
+  for (const f of r.files) console.log(dim(`  ${f}`));
 }

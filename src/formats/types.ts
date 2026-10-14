@@ -35,6 +35,17 @@ export interface Target {
   readonly strictNewlines?: boolean;
   /** Resolves a raw value so generic checks can compare source and translation. */
   analyze(value: string, entry: Entry): ValueAnalysis;
+  /**
+   * Turns a translation written as plain text into the file's own syntax (Android escapes
+   * apostrophes, quotes and `&`). Formats that store plain text don't need it.
+   */
+  prepareValue?(value: string, source: Entry): string;
+  /**
+   * The format can flag a translation as unreviewed without hiding it (String Catalog
+   * `needs_review`). gettext `fuzzy` stops a translation from being used, so drafts there
+   * are tracked only in the lockfile.
+   */
+  readonly marksDrafts?: boolean;
   /** Plural forms this locale needs in this format; undefined when it can't be known. */
   pluralSpec(locale: string): PluralSpec | undefined;
   /** Writes one locale. Entries absent from `catalog` are left as they are on disk. */

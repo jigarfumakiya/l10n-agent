@@ -1,0 +1,8 @@
+terms:
+  - term: Jotter
+    translate: false
+  - term: Jotter Pro
+    translate: false
+  - term: trash
+    note: Where deleted notes go before they are removed for good
+    translations: { hi: ट्रैश, ar: سلة المهملات }

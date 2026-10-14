@@ -25,7 +25,9 @@ function sandbox(): FileSystem & { files: Map<string, string> } {
     files: mem.files,
     readFile: async (f) => mem.files.get(f) ?? nodeFs.readFile(f),
     exists: async (f) => mem.files.has(f) || nodeFs.exists(f),
-    writeFile: (f, c) => mem.writeFile(f, c),
+    writeFile: async (f, c) => {
+      mem.files.set(f, c);
+    },
   };
 }
 
@@ -68,9 +70,6 @@ describe("po adapter", async () => {
         "error hi placeholder-missing",
         "error ar placeholder-missing",
         "error ar placeholder-extra",
-        "warning ar placeholder-missing[0]",
-        "warning ar placeholder-missing[1]",
-        "warning ar placeholder-missing[2]",
       ].sort(),
     );
   });

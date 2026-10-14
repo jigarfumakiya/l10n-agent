@@ -11,7 +11,7 @@ import { relativePath } from "../../core/paths.js";
 import { cldrPluralSpec } from "../../core/plurals.js";
 import type { FormatAdapter, Target, WriteResult } from "../types.js";
 import { folderToLocale, localeToFolder } from "./folders.js";
-import { analyzeAndroidValue, isReference } from "./value.js";
+import { analyzeAndroidValue, isReference, prepareAndroidValue } from "./value.js";
 import {
   childElements,
   escapeAttr,
@@ -55,6 +55,7 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
       issues,
       analyze: (value, entry) =>
         analyzeAndroidValue(value, { formatted: entry.attrs?.formatted !== "false" }),
+      prepareValue: (value, entry) => prepareAndroidValue(value, sourceRaw(entry.message)),
       pluralSpec: (locale) => cldrPluralSpec(locale),
       writeLocale: (catalog) => writeLocale(catalog),
     };
@@ -393,4 +394,12 @@ function spliceEntries(
   const ordered = edits.map((e, i) => ({ ...e, i })).sort((a, b) => b.at - a.at || b.i - a.i);
   for (const e of ordered) out = out.slice(0, e.at) + e.text + out.slice(e.end);
   return out;
+}
+
+function sourceRaw(m: Message): string {
+  return m.kind === "text"
+    ? m.value
+    : m.kind === "plural"
+      ? Object.values(m.forms).join("")
+      : m.items.join("");
 }

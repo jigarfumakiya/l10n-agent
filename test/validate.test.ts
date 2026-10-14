@@ -22,7 +22,6 @@ describe("validate", async () => {
         "error ar greeting placeholder-type",
         "error ar quote escape-apostrophe",
         "warning ar days_left plural-missing-category",
-        "warning ar days_left[one] placeholder-missing",
         "warning ar old_key orphan",
       ].sort(),
     );

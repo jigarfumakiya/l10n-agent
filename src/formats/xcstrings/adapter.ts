@@ -56,6 +56,7 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
     const target: Target = {
       id,
       format: "xcstrings",
+      marksDrafts: true,
       label: config.path,
       source,
       locales,

@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ConfigError, loadConfig } from "../src/core/config.js";
 import { memoryFs } from "../src/core/fs.js";
@@ -9,7 +10,7 @@ describe("config", () => {
         "locales: [HI, pt-br]\ntargets:\n  - format: android-xml\n    path: res\n",
     });
     const { config, root } = await loadConfig(fs, "/app/src/deep");
-    expect(root).toBe("/app");
+    expect(root).toBe(path.resolve("/app"));
     expect(config.locales).toEqual(["hi", "pt-BR"]);
     expect(config.sourceLocale).toBe("en");
     expect(config.lock).toBe(".l10n/lock.json");

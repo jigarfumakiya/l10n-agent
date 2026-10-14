@@ -1,4 +1,5 @@
 import type { Target } from "../formats/types.js";
+import { checkGlossary, type GlossaryTerm, onlyKeptTerms } from "./context.js";
 import { hashMessage } from "./hash.js";
 import {
   type Entry,
@@ -106,12 +107,11 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
         }
         if (!src.translatable) continue;
         issues.push(
-          ...checkTranslation(loaded, spec, src, tgt, locale, project.config.sourceLocale).map(
-            (i) => ({
-              ...where,
-              ...i,
-            }),
-          ),
+          ...checkTranslation(loaded, spec, src, tgt, {
+            locale,
+            sourceLocale: project.config.sourceLocale,
+            glossary: project.context.glossary,
+          }).map((i) => ({ ...where, ...i })),
         );
       }
     }
@@ -119,7 +119,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
   return issues;
 }
 
-type Found = Pick<Issue, "severity" | "code" | "message"> & { form?: string };
+export type Found = Pick<Issue, "severity" | "code" | "message"> & { form?: string };
 
 function checkSource(target: Target, src: Entry): Found[] {
   const out: Found[] = [];
@@ -156,14 +156,15 @@ function checkSource(target: Target, src: Entry): Found[] {
   return out;
 }
 
-function checkTranslation(
+/** Checks one translation against its source: placeholders, plurals, markup, glossary. */
+export function checkTranslation(
   target: Target,
   spec: PluralSpec | undefined,
   src: Entry,
   tgt: Entry,
-  locale: string,
-  sourceLocale: string,
+  opts: { locale: string; sourceLocale: string; glossary?: GlossaryTerm[] },
 ): Found[] {
+  const { locale, sourceLocale } = opts;
   const t = tgt.message;
   // A String Catalog may vary a translation by plural even when the source doesn't.
   const s =
@@ -193,6 +194,8 @@ function checkTranslation(
       sameLanguage,
       allowed,
       strictNewlines: target.strictNewlines,
+      glossary: opts.glossary,
+      locale,
     }).map((f) => (form ? { ...f, form } : f));
 
   if (s.kind === "text" && t.kind === "text") return compare(s.value, t.value);
@@ -293,6 +296,8 @@ export function compareValues(
     sameLanguage?: boolean;
     allowed?: Set<string>;
     strictNewlines?: boolean;
+    glossary?: GlossaryTerm[];
+    locale?: string;
   } = {},
 ): Found[] {
   const out: Found[] = [...t.lints];
@@ -302,11 +307,22 @@ export function compareValues(
   for (const [i, p] of sp) {
     const other = tp.get(i);
     if (!other) {
-      out.push({
-        severity: opts.countImplied ? "warning" : "error",
-        code: "placeholder-missing",
-        message: `Missing ${p.raw}${p.positional || !/^\d+$/.test(i) ? "" : ` (argument ${i})`}`,
-      });
+      const missing = `Missing ${p.raw}${p.positional || !/^\d+$/.test(i) ? "" : ` (argument ${i})`}`;
+      // A form only ever used for one number may spell it out ("one note", "ملاحظتان").
+      const spelledOut = opts.countImplied && /^l{0,2}[diu]$/.test(p.type ?? "");
+      out.push(
+        spelledOut
+          ? {
+              severity: "info",
+              code: "placeholder-implied",
+              message: `${missing}: fine if the number is written out, as this form is used for one number only`,
+            }
+          : {
+              severity: opts.countImplied ? "warning" : "error",
+              code: "placeholder-missing",
+              message: missing,
+            },
+      );
     } else if (other.type !== p.type) {
       out.push({
         severity: "error",
@@ -359,10 +375,14 @@ export function compareValues(
   } else if (
     !opts.sameLanguage &&
     t.text === s.text &&
+    !onlyKeptTerms(opts.glossary ?? [], s.text) &&
     // Single words ("Minute", "Dialog", "OK") are often the same across languages.
     /\p{L}+\s+\p{L}+/u.test(s.text)
   ) {
     out.push({ severity: "warning", code: "untranslated", message: "Same as the source text" });
+  }
+  if (opts.glossary?.length && opts.locale && t.text.trim() !== "") {
+    out.push(...checkGlossary(opts.glossary, opts.locale, s.text, t.text));
   }
   const edge = (x: string) => [/^\s*/.exec(x)?.[0] ?? "", /\s*$/.exec(x)?.[0] ?? ""];
   const [sl, st] = edge(s.text);

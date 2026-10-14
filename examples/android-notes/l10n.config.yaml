@@ -1,0 +1,5 @@
+sourceLocale: en
+locales: [hi, ar]
+targets:
+  - format: android-xml
+    path: app/src/main/res

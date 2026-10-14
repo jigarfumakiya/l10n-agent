@@ -63,6 +63,20 @@ export const ConfigSchema = z
       )
       .min(1, "Add at least one target"),
     lock: z.string().default(".l10n/lock.json"),
+    /** Folder with brief.md, voice/<locale>.md and glossary.yaml. */
+    context: z.string().default(".l10n"),
+    /** Models for `l10n translate`, as `provider:model`: `default`, or per locale. */
+    models: z.record(z.string(), z.string()).optional(),
+    /** Extra OpenAI-compatible providers, by name. */
+    providers: z
+      .record(
+        z.string(),
+        z.strictObject({
+          baseUrl: z.url(),
+          apiKeyEnv: z.string().optional(),
+        }),
+      )
+      .optional(),
   })
   .superRefine((c, ctx) => {
     const seen = new Set<string>();
@@ -98,6 +112,11 @@ const KNOWN_KEYS = [
   "locales",
   "targets",
   "lock",
+  "context",
+  "models",
+  "providers",
+  "baseUrl",
+  "apiKeyEnv",
   "id",
   "format",
   "path",

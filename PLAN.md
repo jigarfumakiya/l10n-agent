@@ -334,10 +334,35 @@ memory:
     write without a terminal or consent, and never overwrites a config without
     `--force`.
   - 132 tests pass.
+- **P4 agent loop done (2026-10-14):**
+  - Context files: `brief.md`, `voice/<locale>.md` (plus `voice/all.md`) and
+    `glossary.yaml`, with glossary checks (`glossary-keep`, `glossary-term`). Names the glossary
+    keeps no longer count as untranslated.
+  - `next-batch`: items carry comment, references, plural forms with sample counts,
+    placeholders, glossary hits, translation memory from every target in the project, and
+    the current translation for stale entries.
+  - `submit`: the `validate` checks plus "every plural form", per-entry errors, drafts written
+    through each format's writer, and lockfile records (hashes, state, model). It never
+    replaces hand edits, reviewed or approved entries without `force`. Android text is escaped
+    automatically.
+  - `approve`: drafts → approved or reviewed. Clears `needs_review`/`fuzzy`, adopts `untracked`
+    and accepts `edited` on request.
+  - Skills: `l10n-setup`, `l10n-translate`, `l10n-review`.
+  - Tried for real: an agent translated `examples/android-notes` into hi and ar with 0 errors.
+  - Spelling out the only number of a plural form is now info, not a warning.
+- **P6 MCP + delegated done (2026-10-14):**
+  - `l10n mcp` (stdio): 10 tools and the skills as prompts, tested with the MCP SDK client (not yet
+    inside Claude Desktop or Cursor). No toolsets or resources yet; the
+    tool list is small enough.
+  - `l10n translate`: Anthropic Messages and OpenAI-compatible chat completions (OpenAI,
+    Gemini, OpenRouter, Ollama, LM Studio, custom) through plain `fetch`. Per-locale routing,
+    parallel calls with one writer, one retry with the errors attached.
+  - Claude Code plugin and marketplace manifests; `npx skills add`; install from GitHub.
+  - 172 tests pass.
 - **Next:**
-  - JSON and ARB.
-  - Then String Catalog substitutions and device variations.
-  - Then P4 (agent loop).
+  - Publish to npm so `npx l10n-agent` works without building from GitHub.
+  - P3 formats (JSON, ARB, String Catalog substitutions).
+  - P7 AI reviewer and review page; P8 GitHub Action.
 
 Every phase ends with something usable and is tried out on real apps. The order changed
 on 2026-10-14: formats and detection come before the agent loop, so the tool works for
@@ -350,9 +375,9 @@ any project first. Day counts are rough focused-work estimates.
 | **P1b Formats** ✅ | Pluggable placeholders and plural models, path patterns; gettext PO, Apple String Catalog | Byte-for-byte round trip on Django and real Xcode catalogs | — |
 | **P2 Detect + init** ✅ | `l10n detect` (candidates with evidence and confidence), `l10n init` (interactive, `--json`, `--yes`) | Finds the right targets in sample Android, iOS, Django and Flutter repos | 2d |
 | **P3 More formats** | JSON (flat, nested, i18next, ICU), Flutter ARB; String Catalog substitutions and device variations | Round trip on real files | 4d |
-| **P4 Agent loop** | Lockfile writes, brief, voice, glossary, memory; `next-batch`, `submit`, drafts; skills `l10n-setup` + `l10n-translate` | An agent translates a sample app to `hi` and `ar` with 0 errors | 3d |
+| **P4 Agent loop** ✅ | Lockfile writes, brief, voice, glossary, memory; `next-batch`, `submit`, drafts; skills `l10n-setup` + `l10n-translate` | An agent translates a sample app to `hi` and `ar` with 0 errors | 3d |
 | **P5 Extraction** | `scan-code` (Kotlin, Swift), `add-source`, key naming, usage context; skill `l10n-extract`; pseudolocale check | A real app goes from hardcoded text to resources | 5d |
-| **P6 MCP + delegated** | MCP server (toolsets, prompts, resources); providers, routing, `translate` | Works in Claude Desktop and Cursor | 3d |
+| **P6 MCP + delegated** ✅ | MCP server (toolsets, prompts, resources); providers, routing, `translate` | Works in Claude Desktop and Cursor | 3d |
 | **P7 Quality** | AI reviewer, scores, review queue, static review page, XLIFF | A first locale ships in a real app | 4d |
 | **P8 CI** | GitHub Action (`validate`, `translate`, PR modes) | Pull requests are gated on localization | 2d |
 | **— v0.1 public release —** | Name check, docs, `examples/`, CONTRIBUTING, npm, `npx skills add`, MCP registry | | 3d |

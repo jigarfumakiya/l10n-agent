@@ -1,0 +1,15 @@
+{
+  "name": "l10n-agent",
+  "description": "Local-first localization for apps",
+  "owner": {
+    "name": "Jigar Fumakiya",
+    "url": "https://github.com/jigarfumakiya"
+  },
+  "plugins": [
+    {
+      "name": "l10n-agent",
+      "source": "./",
+      "description": "Skills to set up, translate and review app translations, plus the l10n MCP server"
+    }
+  ]
+}

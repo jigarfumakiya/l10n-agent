@@ -163,3 +163,38 @@ function resolveEscapes(flat: string, lints: Lint[]): string {
   while (end > start && soft[end - 1]) end--;
   return out.slice(start, end).join("");
 }
+
+const MARKUP =
+  /^(?:<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<\/?[A-Za-z_][\w:.-]*(?:\s+[A-Za-z_][\w:.-]*\s*=\s*(?:"[^"]*"|'[^']*'))*\s*\/?>)/;
+const MARKUP_ALL = new RegExp(MARKUP.source.slice(1), "g");
+const ENTITY = /^&(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/;
+
+/**
+ * Puts a translation written as plain text into resource syntax: apostrophes, quotes and a
+ * leading @ or ? escaped, a bare & or < made an entity, real newlines and tabs written as
+ * \n and \t. Escapes, entities, tags and CDATA already there are kept. When the source
+ * wraps text in "…" (to keep spaces), quotes are left as written, as the translation most
+ * likely does the same.
+ */
+export function prepareAndroidValue(value: string, sourceRaw: string): string {
+  const sourceQuotes = /(?:^|[^\\])"/.test(sourceRaw.replace(MARKUP_ALL, ""));
+  let out = "";
+  for (let i = 0; i < value.length; i++) {
+    const c = value[i] as string;
+    if (c === "\\") {
+      out += value.slice(i, i + 2);
+      i++;
+    } else if (c === "<" || c === "&") {
+      const m = (c === "<" ? MARKUP : ENTITY).exec(value.slice(i));
+      if (m) {
+        out += m[0];
+        i += m[0].length - 1;
+      } else out += c === "<" ? "&lt;" : "&amp;";
+    } else if (c === "'") out += "\\'";
+    else if (c === '"') out += sourceQuotes ? c : '\\"';
+    else if (c === "\n") out += "\\n";
+    else if (c === "\t") out += "\\t";
+    else out += c;
+  }
+  return /^[@?]/.test(out) ? `\\${out}` : out;
+}

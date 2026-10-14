@@ -4,6 +4,7 @@ import { poAdapter } from "../formats/po/adapter.js";
 import type { FormatAdapter, Target } from "../formats/types.js";
 import { xcstringsAdapter } from "../formats/xcstrings/adapter.js";
 import { type Config, loadConfig, type TargetConfig, targetId } from "./config.js";
+import { loadContext, type ProjectContext } from "./context.js";
 import type { FileSystem } from "./fs.js";
 import { type Lockfile, readLock } from "./lock.js";
 
@@ -26,6 +27,7 @@ export interface Project {
   configFile: string;
   lockFile: string;
   lock: Lockfile;
+  context: ProjectContext;
   targets: ProjectTarget[];
   fs: FileSystem;
 }
@@ -47,6 +49,7 @@ export async function openProject(
     configFile: file,
     lockFile,
     lock: await readLock(fs, lockFile),
+    context: await loadContext(fs, path.resolve(root, config.context)),
     targets,
     fs,
   };
@@ -62,6 +65,16 @@ export function openTarget(
 ): Promise<Target> {
   const adapter = ADAPTERS[config.format] as FormatAdapter<TargetConfig>;
   return adapter.open(config, { fs, root, sourceLocale, id });
+}
+
+/** Opens the same project again, to see what's on disk after a write. */
+export function reopenProject(project: Project): Promise<Project> {
+  return openProject(project.fs, { cwd: project.root, config: project.configFile });
+}
+
+/** The loaded target with this id. */
+export function findTarget(project: Project, id: string): Target | undefined {
+  return project.targets.find((t) => t.target.id === id)?.target;
 }
 
 /** Locales to work on: the configured ones, or every locale found on disk if none are configured. */

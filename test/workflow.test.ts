@@ -1,0 +1,355 @@
+import { describe, expect, it } from "vitest";
+import { checkGlossary, glossaryHits, onlyKeptTerms } from "../src/core/context.js";
+import { memoryFs } from "../src/core/fs.js";
+import { openProject } from "../src/core/project.js";
+import { computeStatus } from "../src/core/status.js";
+import { validateProject } from "../src/core/validate.js";
+import { approve, nextBatch, submit } from "../src/core/workflow.js";
+import { prepareAndroidValue } from "../src/formats/android/value.js";
+
+const STRINGS = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Button that saves the budget -->
+    <string name="save">Save</string>
+    <string name="welcome">Welcome to StillMoney, %1$s!</string>
+    <string name="brand" translatable="false">StillMoney</string>
+    <plurals name="days_left">
+        <item quantity="one">%d day left</item>
+        <item quantity="other">%d days left</item>
+    </plurals>
+    <string name="cancel">Cancel</string>
+</resources>
+`;
+
+const IOS = JSON.stringify(
+  {
+    sourceLanguage: "en",
+    strings: {
+      Cancel: { comment: "Dismisses a sheet" },
+    },
+    version: "1.0",
+  },
+  null,
+  2,
+);
+
+function project(files: Record<string, string> = {}) {
+  return memoryFs({
+    "/p/l10n.config.yaml": [
+      "locales: [hi, ar]",
+      "targets:",
+      "  - format: android-xml",
+      "    path: app/src/main/res",
+      "  - format: xcstrings",
+      "    path: ios/Localizable.xcstrings",
+    ].join("\n"),
+    "/p/app/src/main/res/values/strings.xml": STRINGS,
+    "/p/ios/Localizable.xcstrings": IOS,
+    "/p/.l10n/brief.md": "StillMoney is a calm budgeting app.",
+    "/p/.l10n/voice/hi.md": "Use तुम, not आप.",
+    "/p/.l10n/glossary.yaml": [
+      "terms:",
+      "  - term: StillMoney",
+      "    translate: false",
+      "  - term: budget",
+      "    translations: { hi: बजट }",
+    ].join("\n"),
+    ...files,
+  });
+}
+const open = (fs: ReturnType<typeof project>) => openProject(fs, { cwd: "/p" });
+
+describe("nextBatch", () => {
+  it("lists what needs translating with plural forms, placeholders, glossary and context", async () => {
+    const batch = nextBatch(await open(project()), { locales: ["ar"] });
+    expect(batch.items.map((i) => `${i.target} ${i.key}`)).toEqual([
+      "android save",
+      "android welcome",
+      "android days_left",
+      "android cancel",
+      "xcstrings Cancel",
+    ]);
+    expect(batch.brief).toContain("calm budgeting");
+    expect(batch.locales).toEqual({ ar: { language: "Arabic" } });
+    const [save, welcome, days] = batch.items;
+    expect(save).toMatchObject({ comment: "Button that saves the budget", state: "missing" });
+    expect(welcome).toMatchObject({
+      placeholders: ["%1$s"],
+      glossary: [{ term: "StillMoney", keep: true }],
+    });
+    expect(days?.pluralForms?.map((f) => f.form)).toEqual([
+      "zero",
+      "one",
+      "two",
+      "few",
+      "many",
+      "other",
+    ]);
+    expect(days?.source).toEqual({ one: "%d day left", other: "%d days left" });
+  });
+
+  it("includes voice per locale, limits and pages", async () => {
+    const p = await open(project());
+    const first = nextBatch(p, { locales: ["hi"], limit: 2 });
+    expect(first.items).toHaveLength(2);
+    expect(first.remaining).toBe(3);
+    expect(first.locales.hi?.voice).toBe("Use तुम, not आप.");
+    const second = nextBatch(p, { locales: ["hi"], limit: 2, offset: 2 });
+    expect(second.items.map((i) => i.key)).toEqual(["days_left", "cancel"]);
+  });
+});
+
+describe("submit", () => {
+  it("writes valid drafts, rejects broken ones and records the lockfile", async () => {
+    const fs = project();
+    const result = await submit(
+      await open(fs),
+      [
+        { locale: "hi", key: "save", value: "सहेजें" },
+        { locale: "hi", key: "welcome", value: "StillMoney में स्वागत है!" },
+        { locale: "hi", target: "android", key: "cancel", value: "रद्द करें" },
+        { locale: "hi", key: "days_left", value: { one: "%d दिन बाकी", other: "%d दिन बाकी" } },
+      ],
+      { model: "test-model" },
+    );
+    expect(result.rejected).toEqual([
+      {
+        target: "android",
+        locale: "hi",
+        key: "welcome",
+        errors: [{ severity: "error", code: "placeholder-missing", message: "Missing %1$s" }],
+      },
+    ]);
+    expect(result.accepted.map((a) => a.key)).toEqual(["save", "cancel", "days_left"]);
+    expect(result.files).toEqual(["app/src/main/res/values-hi/strings.xml"]);
+    const written = fs.files.get("/p/app/src/main/res/values-hi/strings.xml") ?? "";
+    expect(written).toContain('<string name="save">सहेजें</string>');
+    expect(written).toContain('<item quantity="other">%d दिन बाकी</item>');
+
+    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    expect(lock.targets.android.hi.save).toMatchObject({ state: "draft", model: "test-model" });
+    const status = computeStatus(await open(fs), ["hi"]).find((s) => s.target === "android");
+    expect(status?.counts).toMatchObject({ draft: 3, missing: 1 });
+    expect(validateProject(await open(fs)).filter((i) => i.severity === "error")).toEqual([]);
+  });
+
+  it("needs a target when two have the same key, and escapes Android text", async () => {
+    const fs = project();
+    const r = await submit(await open(fs), [
+      { locale: "ar", key: "Cancel", value: "إلغاء" },
+      { locale: "ar", key: "save", value: 'احفظ "الآن" & لا تنتظر' },
+    ]);
+    expect(r.accepted.map((a) => `${a.target} ${a.key}`)).toEqual([
+      "xcstrings Cancel",
+      "android save",
+    ]);
+    expect(fs.files.get("/p/app/src/main/res/values-ar/strings.xml")).toContain(
+      '<string name="save">احفظ \\"الآن\\" &amp; لا تنتظر</string>',
+    );
+    const catalog = JSON.parse(fs.files.get("/p/ios/Localizable.xcstrings") ?? "{}");
+    expect(catalog.strings.Cancel.localizations.ar.stringUnit).toEqual({
+      state: "needs_review",
+      value: "إلغاء",
+    });
+  });
+
+  it("asks for every plural form and refuses forms the language doesn't have", async () => {
+    const r = await submit(await open(project()), [
+      { locale: "ar", key: "days_left", value: { one: "يوم", other: "%d يومًا", dual: "%d x" } },
+    ]);
+    expect(r.rejected[0]?.errors.map((e) => e.code)).toEqual([
+      "plural-missing-category",
+      "plural-extra-category",
+    ]);
+    expect(r.rejected[0]?.errors[0]?.message).toMatch(/zero.*two.*few.*many/);
+  });
+
+  it("rejects unknown keys, untranslatable strings, the wrong shape and other locales", async () => {
+    const r = await submit(await open(project()), [
+      { locale: "hi", key: "nope", value: "x" },
+      { locale: "hi", key: "brand", value: "x" },
+      { locale: "hi", key: "save", value: ["x"] },
+      { locale: "de", key: "save", value: "Speichern" },
+      { locale: "en", key: "save", value: "Save" },
+    ]);
+    expect(r.accepted).toEqual([]);
+    expect(r.rejected.map((x) => x.errors[0]?.code)).toEqual([
+      "key-unknown",
+      "key-unknown",
+      "kind-mismatch",
+      "locale-invalid",
+      "locale-invalid",
+    ]);
+  });
+
+  it("never replaces a hand edit or an approved translation unless forced", async () => {
+    const fs = project();
+    await submit(await open(fs), [{ locale: "hi", key: "save", value: "सहेजें" }]);
+    const file = "/p/app/src/main/res/values-hi/strings.xml";
+    fs.files.set(file, (fs.files.get(file) ?? "").replace("सहेजें", "सेव करें"));
+    const p = await open(fs);
+    expect(computeStatus(p, ["hi"])[0]?.entries.find((e) => e.key === "save")?.state).toBe(
+      "edited",
+    );
+    const blocked = await submit(p, [{ locale: "hi", key: "save", value: "बचाएं" }]);
+    expect(blocked.rejected[0]?.errors[0]?.code).toBe("state-edited");
+    const forced = await submit(p, [{ locale: "hi", key: "save", value: "बचाएं" }], { force: true });
+    expect(forced.accepted).toHaveLength(1);
+  });
+
+  it("dry runs write nothing", async () => {
+    const fs = project();
+    const r = await submit(await open(fs), [{ locale: "hi", key: "save", value: "सहेजें" }], {
+      dryRun: true,
+    });
+    expect(r.accepted).toHaveLength(1);
+    expect(fs.files.has("/p/app/src/main/res/values-hi/strings.xml")).toBe(false);
+    expect(fs.files.has("/p/.l10n/lock.json")).toBe(false);
+  });
+
+  it("offers translations of the same text from other targets", async () => {
+    const fs = project();
+    await submit(await open(fs), [{ locale: "hi", key: "Cancel", value: "रद्द करें" }]);
+    const batch = nextBatch(await open(fs), { locales: ["hi"], keys: ["cancel"] });
+    expect(batch.items[0]?.memory).toEqual([{ value: "रद्द करें", from: "xcstrings:Cancel" }]);
+  });
+
+  it("warns when the glossary isn't followed", async () => {
+    const fs = project({
+      "/p/app/src/main/res/values/strings.xml": STRINGS.replace(
+        "</resources>",
+        '    <string name="edit_budget">Edit budget</string>\n</resources>',
+      ),
+    });
+    const r = await submit(await open(fs), [
+      { locale: "hi", key: "edit_budget", value: "बजट बदलें" },
+      { locale: "ar", key: "edit_budget", value: "تعديل الميزانية" },
+      { locale: "ar", key: "welcome", value: "مرحبًا بك في ستيل موني، %1$s!" },
+    ]);
+    expect(r.accepted.map((a) => a.warnings.map((w) => w.code))).toEqual([
+      [],
+      [],
+      ["glossary-keep"],
+    ]);
+  });
+});
+
+describe("approve", () => {
+  it("approves drafts and clears the String Catalog's needs_review", async () => {
+    const fs = project();
+    await submit(await open(fs), [
+      { locale: "hi", key: "save", value: "सहेजें" },
+      { locale: "hi", key: "Cancel", value: "रद्द करें" },
+    ]);
+    const r = await approve(await open(fs), { locales: ["hi"] });
+    expect(r.changed.map((c) => `${c.target} ${c.key} ${c.from}`)).toEqual([
+      "android save draft",
+      "xcstrings Cancel draft",
+    ]);
+    expect(r.files).toEqual(["ios/Localizable.xcstrings"]);
+    const catalog = JSON.parse(fs.files.get("/p/ios/Localizable.xcstrings") ?? "{}");
+    expect(catalog.strings.Cancel.localizations.hi.stringUnit.state).toBe("translated");
+    const states = computeStatus(await open(fs), ["hi"]).flatMap((s) =>
+      s.entries.filter((e) => e.state !== "missing").map((e) => e.state),
+    );
+    expect(states).toEqual(["approved", "approved"]);
+    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    expect(lock.targets.android.hi.save.state).toBe("approved");
+  });
+
+  it("adopts existing translations and hand edits only when asked", async () => {
+    const fs = project({
+      "/p/app/src/main/res/values-hi/strings.xml":
+        '<resources><string name="save">सहेजें</string></resources>',
+    });
+    expect((await approve(await open(fs))).changed).toEqual([]);
+    const r = await approve(await open(fs), { states: ["untracked"] });
+    expect(r.changed).toEqual([
+      { target: "android", locale: "hi", key: "save", from: "untracked" },
+    ]);
+  });
+});
+
+describe("prepareAndroidValue", () => {
+  it.each([
+    ["Don't", "Don\\'t"],
+    ["Don\\'t", "Don\\'t"],
+    ['Say "hi"', 'Say \\"hi\\"'],
+    ["Tom & Jerry", "Tom &amp; Jerry"],
+    ["a &amp; b", "a &amp; b"],
+    [
+      '<b>Bold</b> & <xliff:g id="n">%1$s</xliff:g>',
+      '<b>Bold</b> &amp; <xliff:g id="n">%1$s</xliff:g>',
+    ],
+    ["1 < 2", "1 &lt; 2"],
+    ["line\nbreak", "line\\nbreak"],
+    ["@home", "\\@home"],
+  ])("%s → %s", (input, expected) => {
+    expect(prepareAndroidValue(input, "plain")).toBe(expected);
+  });
+
+  it("leaves quotes alone when the source uses a quoted region", () => {
+    expect(prepareAndroidValue('"  indented"', '"  indented"')).toBe('"  indented"');
+  });
+});
+
+describe("glossary", () => {
+  const glossary = [
+    { term: "StillMoney", translate: false, caseSensitive: false },
+    { term: "budget", translate: true, caseSensitive: false, translations: { ar: "ميزانية" } },
+  ];
+  it("matches whole words only", () => {
+    expect(glossaryHits(glossary, "Budgets and budget").map((t) => t.term)).toEqual(["budget"]);
+    expect(glossaryHits(glossary, "Budgeting")).toEqual([]);
+  });
+  it("accepts fixed terms inside inflected words", () => {
+    expect(checkGlossary(glossary, "ar", "Your budget", "الميزانية الخاصة بك")).toEqual([]);
+    expect(checkGlossary(glossary, "ar", "Your budget", "مصروفك")[0]?.code).toBe("glossary-term");
+  });
+  it("knows a text of kept terms is not untranslated", () => {
+    expect(onlyKeptTerms(glossary, "StillMoney")).toBe(true);
+    expect(onlyKeptTerms(glossary, "StillMoney Pro plan")).toBe(false);
+  });
+});
+
+describe("submit to gettext", () => {
+  const fs = () =>
+    memoryFs({
+      "/g/l10n.config.yaml":
+        "locales: [ru]\ntargets:\n  - format: po\n    path: po/{locale}.po\n    template: po/app.pot\n",
+      "/g/po/app.pot": [
+        'msgid ""',
+        'msgstr "Content-Type: text/plain; charset=UTF-8\\n"',
+        "",
+        "#, python-format",
+        'msgid "%(n)d file"',
+        'msgid_plural "%(n)d files"',
+        'msgstr[0] ""',
+        'msgstr[1] ""',
+        "",
+      ].join("\n"),
+    });
+
+  it("asks for numbered forms with examples and writes a new file without fuzzy", async () => {
+    const files = fs();
+    const p = await openProject(files, { cwd: "/g" });
+    const [item] = nextBatch(p).items;
+    expect(item?.pluralForms?.map((f) => [f.form, f.examples.split(",")[0]])).toEqual([
+      ["0", "1"],
+      ["1", "2"],
+      ["2", "0"],
+    ]);
+    const r = await submit(p, [
+      {
+        locale: "ru",
+        key: "%(n)d file",
+        value: { 0: "%(n)d файл", 1: "%(n)d файла", 2: "%(n)d файлов" },
+      },
+    ]);
+    expect(r.rejected).toEqual([]);
+    const po = files.files.get("/g/po/ru.po") ?? "";
+    expect(po).toContain('msgstr[2] "%(n)d файлов"');
+    expect(po).not.toContain("fuzzy");
+    expect(computeStatus(await openProject(files, { cwd: "/g" }))[0]?.counts.draft).toBe(1);
+  });
+});
