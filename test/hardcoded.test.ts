@@ -83,3 +83,23 @@ describe("hardcoded text", () => {
     expect(notes[0]?.message).toMatch(/localship-extract/);
   });
 });
+
+describe("init on a mostly hardcoded app", () => {
+  it("sets up, but warns and points to extraction instead of translating", async () => {
+    const { runInit } = await import("../src/cli/init-command.js");
+    const fs = app();
+    const out: string[] = [];
+    const io = {
+      interactive: false,
+      log: (l: string) => out.push(l),
+      error: (l: string) => out.push(l),
+      ask: async (_q: string, f: string) => f,
+    };
+    expect(await runInit(fs, { cwd: "/r", yes: true, locales: ["hi"] }, io)).toBe(0);
+    expect(fs.files.has("/r/localship.yaml")).toBe(true);
+    const text = out.join("\n");
+    expect(text).toMatch(/about 12 pieces of UI text are still written in the code/);
+    expect(text).toMatch(/Next: move the text into resources/);
+    expect(text).not.toMatch(/Next: `localship status`/);
+  });
+});

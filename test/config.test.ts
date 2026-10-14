@@ -26,7 +26,7 @@ describe("config", () => {
 
   it("says how to start when there is no config", async () => {
     await expect(loadConfig(memoryFs({ "/x/a": "" }), "/x")).rejects.toThrow(
-      /No localship\.yaml found[\s\S]*localship init/,
+      /No localship\.yaml found[\s\S]*localship detect[\s\S]*localship init/,
     );
   });
 });

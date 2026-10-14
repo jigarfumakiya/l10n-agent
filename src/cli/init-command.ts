@@ -1,7 +1,7 @@
 import path from "node:path";
 import { CONFIG_FILE, LEGACY_CONFIG_FILE } from "../core/config.js";
 import type { FileSystem } from "../core/fs.js";
-import { detect } from "../detect/detect.js";
+import { detect, mostlyHardcoded } from "../detect/detect.js";
 import {
   buildConfig,
   canonicalLocales,
@@ -86,9 +86,17 @@ export async function runInit(fs: FileSystem, opts: InitOptions, io: Io): Promis
     const config = buildConfig(result, { accept, sourceLocale, locales });
     const text = renderConfig(config);
     await fs.writeFile(file, text);
+    // Setting up is fine, but translating now would leave most of the app in English.
+    const warnings = accept.flatMap((n) => {
+      const c = result.candidates[n - 1];
+      if (!c?.codeLiterals || !mostlyHardcoded(c.codeLiterals, c.strings)) return [];
+      return [
+        `${c.target.path}: about ${c.codeLiterals} pieces of UI text are still written in the code, against ${c.strings} string${c.strings === 1 ? "" : "s"} in resources. Make the app localizable first (the localship-extract skill), or translations will cover only part of it.`,
+      ];
+    });
 
     if (opts.json) {
-      io.log(JSON.stringify({ file, config, detected: result }, null, 2));
+      io.log(JSON.stringify({ file, config, warnings, detected: result }, null, 2));
     } else {
       const shown = path.relative(process.cwd(), file);
       io.log(`Wrote ${shown.startsWith("..") ? file : shown}:`);
@@ -98,8 +106,11 @@ export async function runInit(fs: FileSystem, opts: InitOptions, io: Io): Promis
       if (config.locales.length === 0) {
         io.log("No target languages yet: add some under `locales:`.");
       }
+      for (const w of warnings) io.log(`▲ ${w}`);
       io.log(
-        "Next: `localship status` to see progress, `localship validate` to check translations.",
+        warnings.length
+          ? "Next: move the text into resources (the localship-extract skill), then translate."
+          : "Next: `localship status` to see progress, `localship validate` to check translations.",
       );
     }
     return 0;

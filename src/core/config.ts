@@ -190,7 +190,7 @@ export async function loadConfig(
     }
     if (!file)
       throw new ConfigError(
-        `No ${CONFIG_FILE} found in ${cwd} or its parents. Run \`localship init\` to create one.`,
+        `No ${CONFIG_FILE} found in ${cwd} or its parents, so Localship isn't set up here yet. Run \`localship detect\` to see what's in this repo, then \`localship init\` to set it up.`,
       );
   }
 
