@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="title">Budget</string>
+    <string name="tos">Read the <b>terms</b> before <xliff:g id="date" example="Oct 1">%1$s</xliff:g></string>
+    <string name="raw" formatted="false">100% &amp; more</string>
+    <string name="cdata"><![CDATA[<i>Hello</i>]]></string>
+    <string name="quoted">"  keep   spaces  "</string>
+    <string name="label" product="tablet">Wide label</string>
+    <string name="label">Label</string>
+    <plurals name="days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <string-array name="tabs">
+        <item>Home</item>
+        <item>Budget</item>
+    </string-array>
+</resources>

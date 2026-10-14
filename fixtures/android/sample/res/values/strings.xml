@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="app_name" translatable="false">Sample</string>
+
+    <!-- Home title. Shown at the top of the main screen. -->
+    <string name="home_title">Safe to spend today</string>
+    <string name="greeting">Hi %1$s, you have %2$d new alerts</string>
+    <string name="loose_args">%s spent %d</string>
+    <string name="discount">50% off for founders</string>
+    <string name="quote">Don\'t give up</string>
+    <string name="tos">Read the <b>terms</b> before <xliff:g id="date" example="Oct 1">%1$s</xliff:g></string>
+    <plurals name="days_left">
+        <item quantity="one">%d day left</item>
+        <item quantity="other">%d days left</item>
+    </plurals>
+    <string-array name="weekdays">
+        <item>Mon</item>
+        <item>Tue</item>
+    </string-array>
+</resources>

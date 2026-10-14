@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_title">आज खर्च के लिए सुरक्षित</string>
+    <string name="greeting">नमस्ते %1$s, आपके पास %2$d नए अलर्ट हैं</string>
+    <string name="discount">संस्थापकों के लिए 50% छूट</string>
+    <string name="quote">हार मत मानो</string>
+    <string name="tos">%1$s से पहले <b>शर्तें</b> पढ़ें</string>
+    <plurals name="days_left">
+        <item quantity="one">%d दिन बाकी</item>
+        <item quantity="other">%d दिन बाकी</item>
+    </plurals>
+    <string-array name="weekdays">
+        <item>सोम</item>
+    </string-array>
+</resources>

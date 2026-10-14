@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+import { memoryFs } from "../src/core/fs.js";
+import { hashMessage } from "../src/core/hash.js";
+import { openProject } from "../src/core/project.js";
+import { computeStatus } from "../src/core/status.js";
+
+const text = (value: string) => ({ kind: "text" as const, value });
+
+describe("status", () => {
+  it("derives states from the lockfile", async () => {
+    const lock = {
+      version: 1,
+      targets: {
+        android: {
+          hi: {
+            ok: {
+              source: hashMessage(text("OK")),
+              target: hashMessage(text("ठीक")),
+              state: "approved",
+            },
+            changed: {
+              source: hashMessage(text("Old")),
+              target: hashMessage(text("पुराना")),
+              state: "draft",
+            },
+            edited: {
+              source: hashMessage(text("Edit")),
+              target: hashMessage(text("x")),
+              state: "draft",
+            },
+          },
+        },
+      },
+    };
+    const fs = memoryFs({
+      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    res: res\n",
+      "/app/.l10n/lock.json": JSON.stringify(lock),
+      "/app/res/values/strings.xml":
+        '<resources><string name="ok">OK</string><string name="changed">New</string><string name="edited">Edit</string><string name="hand">Hand</string><string name="todo">Todo</string><string name="fixed" translatable="false">X</string></resources>',
+      "/app/res/values-hi/strings.xml":
+        '<resources><string name="ok">ठीक</string><string name="changed">पुराना</string><string name="edited">संपादित</string><string name="hand">हाथ</string></resources>',
+    });
+    const [s] = computeStatus(await openProject(fs, { cwd: "/app" }));
+    expect(s?.total).toBe(5);
+    expect(Object.fromEntries(s?.entries.map((e) => [e.key, e.state]) ?? [])).toEqual({
+      ok: "approved",
+      changed: "stale",
+      edited: "edited",
+      hand: "untracked",
+      todo: "missing",
+    });
+  });
+});

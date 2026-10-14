@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="title">الميزانية</string>
+    <string name="tos">اقرأ <b>الشروط</b> قبل <xliff:g id="date" example="Oct 1">%1$s</xliff:g></string>
+    <string name="raw" formatted="false">100% &amp; المزيد</string>
+    <string name="cdata"><![CDATA[<i>مرحبًا</i>]]></string>
+    <string name="quoted">"  مسافات   محفوظة  "</string>
+    <string name="label" product="tablet">تسمية عريضة</string>
+    <string name="label">تسمية</string>
+    <plurals name="days">
+        <item quantity="zero">لا أيام</item>
+        <item quantity="one">يوم واحد</item>
+        <item quantity="two">يومان</item>
+        <item quantity="few">%d أيام</item>
+        <item quantity="many">%d يومًا</item>
+        <item quantity="other">%d يوم</item>
+    </plurals>
+    <string-array name="tabs">
+        <item>الرئيسية</item>
+        <item>الميزانية</item>
+    </string-array>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">عينة</string>
+    <string name="home_title">آمن للإنفاق اليوم</string>
+    <string name="greeting">مرحبًا %1$d، لديك %2$d تنبيهات جديدة</string>
+    <string name="quote">لا تستسلم 'أبدًا'</string>
+    <plurals name="days_left">
+        <item quantity="one">بقي يوم واحد</item>
+        <item quantity="other">بقي %d يوم</item>
+    </plurals>
+    <string name="old_key">قديم</string>
+</resources>
