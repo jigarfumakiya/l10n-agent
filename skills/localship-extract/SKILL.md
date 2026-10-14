@@ -11,6 +11,9 @@ the rules below keep it safe. Change how text is looked up, never what the app d
 
 ## 1. Find the text
 
+`localship detect` (or `localship_detect`) gives a first estimate: how much UI text is still in the
+code, per module, with examples. Use it to size the work, then search properly as below.
+
 Search the UI code for user-facing literals and show the user a summary grouped by screen or
 feature, with counts. Ask whether to do the whole app or one feature first. For big apps, go one
 feature at a time and build after each.

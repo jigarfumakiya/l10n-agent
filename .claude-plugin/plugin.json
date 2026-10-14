@@ -12,8 +12,8 @@
   "keywords": ["localization", "l10n", "i18n", "android", "ios", "xcstrings", "gettext"],
   "mcpServers": {
     "localship": {
-      "command": "npx",
-      "args": ["-y", "github:jigarfumakiya/localship", "mcp"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-launcher.mjs"]
     }
   }
 }

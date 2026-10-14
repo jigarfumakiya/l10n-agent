@@ -3,6 +3,7 @@ import type { TargetConfig } from "../core/config.js";
 import type { FileSystem } from "../core/fs.js";
 import { LOCALE_TOKEN, parseLocaleSegment } from "../core/paths.js";
 import { openTarget } from "../core/project.js";
+import { estimateHardcoded, type HardcodedText, literalsForResDir } from "./hardcoded.js";
 import { walk } from "./walk.js";
 
 export type Confidence = "high" | "medium" | "low";
@@ -21,6 +22,8 @@ export interface Candidate {
   sourceLocale?: string;
   /** Things a person should confirm before this goes in the config. */
   questions: string[];
+  /** User-facing text still written in this module's code, estimated (Android). */
+  codeLiterals?: number;
 }
 
 export interface UnsupportedFind {
@@ -39,6 +42,8 @@ export interface DetectResult {
   locales: string[];
   /** Suggestions when a project looks localizable but has no translation files yet. */
   hints: string[];
+  /** Estimated user-facing text still hardcoded in code, per platform. */
+  hardcoded: HardcodedText[];
   truncated: boolean;
 }
 
@@ -51,6 +56,8 @@ export async function detect(fs: FileSystem, root: string): Promise<DetectResult
     ...(await detectPo(fs, root, files)),
     ...(await detectXcstrings(fs, root, files)),
   ];
+  const hardcoded = await estimateHardcoded(fs, root, files);
+  flagHardcoded(found, hardcoded);
   const candidates = found.sort(
     (a, b) => RANK[a.confidence] - RANK[b.confidence] || b.strings - a.strings,
   );
@@ -79,7 +86,8 @@ export async function detect(fs: FileSystem, root: string): Promise<DetectResult
     unsupported,
     sourceLocale,
     locales,
-    hints: hints(files, candidates, unsupported),
+    hints: hints(files, candidates, unsupported, hardcoded),
+    hardcoded,
     truncated,
   };
 }
@@ -312,8 +320,49 @@ async function detectXcstrings(
 
 // ── Hints ────────────────────────────────────────────────────────────────────
 
-function hints(files: string[], candidates: Candidate[], unsupported: UnsupportedFind[]): string[] {
+/** More text in the code than in the resources means the app isn't localizable yet. */
+export function mostlyHardcoded(codeLiterals: number, resourceStrings: number): boolean {
+  return codeLiterals >= 10 && codeLiterals > resourceStrings;
+}
+
+function flagHardcoded(candidates: Candidate[], hardcoded: HardcodedText[]) {
+  const android = hardcoded.find((h) => h.platform === "android");
+  for (const c of candidates) {
+    if (c.target.format !== "android-xml") continue;
+    const literals = literalsForResDir(android, c.target.path);
+    if (literals === 0) continue;
+    c.codeLiterals = literals;
+    c.evidence.push(`about ${literals} pieces of UI text still in the code`);
+    if (!mostlyHardcoded(literals, c.strings)) continue;
+    if (c.confidence === "high") c.confidence = "medium";
+    c.questions.unshift(
+      `About ${literals} pieces of UI text are still written in the code, more than the ${c.strings} string${c.strings === 1 ? "" : "s"} in resources. Translating now would cover only part of the app: make it localizable first (the localship-extract skill).`,
+    );
+  }
+}
+
+function hardcodedSummary(h: HardcodedText): string {
+  const example = h.examples[0];
+  return `about ${h.literals} pieces of UI text in ${h.files} file${h.files === 1 ? "" : "s"}${example ? ` (e.g. "${example.text}" in ${example.at})` : ""}`;
+}
+
+function hints(
+  files: string[],
+  candidates: Candidate[],
+  unsupported: UnsupportedFind[],
+  hardcoded: HardcodedText[],
+): string[] {
   const out: string[] = [];
+  const androidCode = hardcoded.find((h) => h.platform === "android");
+  const iosCode = hardcoded.find((h) => h.platform === "ios");
+  const flagged = candidates.filter(
+    (c) => c.codeLiterals !== undefined && mostlyHardcoded(c.codeLiterals, c.strings),
+  );
+  if (androidCode && flagged.length) {
+    out.push(
+      `Most of this app's text is still in the code: ${hardcodedSummary(androidCode)}. Make it localizable first (the localship-extract skill moves it into strings.xml), then set up translation.`,
+    );
+  }
   const has = (format: string) => candidates.some((c) => c.target.format === format);
   const appleLegacy = unsupported.some((u) => u.format.startsWith("Apple"));
   const xcode = files.some(
@@ -322,7 +371,7 @@ function hints(files: string[], candidates: Candidate[], unsupported: Unsupporte
   );
   if (xcode && !has("xcstrings") && !appleLegacy) {
     out.push(
-      "This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Text built from variables needs moving to String(localized:) first (the localship-extract skill helps). Then run detect again.",
+      `This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Text built from variables needs moving to String(localized:) first (the localship-extract skill helps)${iosCode ? `; UIKit code also has ${hardcodedSummary(iosCode)}` : ""}. Then run detect again.`,
     );
   }
   const gradle = files.some((f) => /(^|\/)build\.gradle(\.kts)?$/.test(f));
@@ -332,7 +381,7 @@ function hints(files: string[], candidates: Candidate[], unsupported: Unsupporte
     files.some((f) => /\/src\/main\/AndroidManifest\.xml$/.test(f))
   ) {
     out.push(
-      "This looks like an Android project with no strings in res/values yet: the UI text is probably written in the code. Move it into res/values/strings.xml first (the localship-extract skill does this with your agent), then run detect again.",
+      `This looks like an Android project with no strings in res/values yet: the UI text is ${androidCode ? `in the code, ${hardcodedSummary(androidCode)}` : "probably written in the code"}. Move it into res/values/strings.xml first (the localship-extract skill does this with your agent), then run detect again.`,
     );
   }
   return out;

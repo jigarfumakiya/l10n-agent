@@ -21,6 +21,7 @@ import {
   submit,
 } from "../core/workflow.js";
 import { detect } from "../detect/detect.js";
+import { hardcodedNotes } from "../detect/hardcoded.js";
 import { TRANSLATION_RULES } from "../translate/prompt.js";
 import { translateProject } from "../translate/translate.js";
 
@@ -89,6 +90,7 @@ export function createServer(opts: ServerOptions): McpServer {
           path: t.target.label,
         })),
         status: computeStatus(p, locales).map(({ entries: _, ...s }) => s),
+        codeText: await hardcodedNotes(p),
       };
     },
     { readOnlyHint: true },

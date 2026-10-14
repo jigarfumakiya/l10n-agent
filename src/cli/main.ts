@@ -16,6 +16,7 @@ import {
   submit,
 } from "../core/workflow.js";
 import { detect } from "../detect/detect.js";
+import { hardcodedNotes } from "../detect/hardcoded.js";
 import { translateProject } from "../translate/translate.js";
 import { runInit } from "./init-command.js";
 import {
@@ -76,10 +77,12 @@ program
   .action(async (opts: { locale?: string[]; json?: boolean }) => {
     const project = await openProject(nodeFs, globals());
     const status = computeStatus(project, opts.locale);
+    const codeText = await hardcodedNotes(project);
     if (opts.json) {
-      console.log(JSON.stringify({ status }, null, 2));
+      console.log(JSON.stringify({ status, codeText }, null, 2));
     } else {
       printStatus(project, status);
+      for (const n of codeText) console.log(`▲ ${n.target}: ${n.message}`);
     }
   });
 

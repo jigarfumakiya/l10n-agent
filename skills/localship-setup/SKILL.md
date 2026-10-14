@@ -21,12 +21,13 @@ user can tell your changes apart from theirs.
 
 ## 1. Find out where the project stands
 
-Run `localship status`. If it works, the project is already set up: go to step 5 (context) if
+Run `localship status`. If it works, the project is already set up (if it warns that most text is still in the code, go to case C): go to step 5 (context) if
 `.localship/brief.md` is missing, or to **Adding languages** below. Otherwise run `localship detect` and
 pick the case that fits:
 
 | What detect shows | Case |
 |---|---|
+| A warning that most of the app's text is still in the code (more UI text in code than strings in resources) | **C. Text is hardcoded**, even if a few strings exist: run `localship-extract` first, or translations will cover only part of the app. Tell the user how much is in code |
 | Setups with existing languages (`hi, ar` …) | **A. Already localized** |
 | Setups with strings but no languages | **B. Ready to translate** |
 | An empty String Catalog (0 strings) | Ask the user to build the app in Xcode once, then detect again |
