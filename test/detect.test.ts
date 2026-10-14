@@ -1,0 +1,230 @@
+import { describe, expect, it } from "vitest";
+import { parse as parseYaml } from "yaml";
+import { type Io, runInit } from "../src/cli/init-command.js";
+import { memoryFs } from "../src/core/fs.js";
+import { openProject } from "../src/core/project.js";
+import { detect, poPattern } from "../src/detect/detect.js";
+
+const strings = (...names: string[]) =>
+  `<resources>${names.map((n) => `<string name="${n}">${n}</string>`).join("")}</resources>`;
+const po = (pairs: Record<string, string>) =>
+  Object.entries(pairs)
+    .map(([id, str]) => `msgid "${id}"\nmsgstr "${str}"\n`)
+    .join("\n");
+const catalog = (source: string, keys: string[]) =>
+  JSON.stringify({
+    sourceLanguage: source,
+    strings: Object.fromEntries(keys.map((k) => [k, {}])),
+    version: "1.0",
+  });
+
+describe("poPattern", () => {
+  it.each([
+    ["locale/de/LC_MESSAGES/django.po", "locale/{locale}/LC_MESSAGES/django.po", "de"],
+    ["po/pt_BR.po", "po/{locale}.po", "pt-BR"],
+    ["languages/my-plugin-de_DE.po", "languages/my-plugin-{locale}.po", "de-DE"],
+    ["app/i18n/sr@latin/messages.po", "app/i18n/{locale}/messages.po", "sr-Latn"],
+  ])("%s → %s", (file, pattern, locale) => {
+    expect(poPattern(file)).toMatchObject({ pattern, locale });
+  });
+
+  it("ignores .po files with no locale in the path", () => {
+    expect(poPattern("docs/notes.po")).toBeUndefined();
+  });
+});
+
+describe("detect", () => {
+  it("finds Android modules and skips tests, build output and resource-only folders", async () => {
+    const fs = memoryFs({
+      "/r/app/src/main/res/values/strings.xml": strings("a", "b", "c"),
+      "/r/app/src/main/res/values-hi/strings.xml": strings("a"),
+      "/r/app/src/debug/res/values/strings.xml": strings("debug_banner"),
+      "/r/app/src/test/res/values/strings.xml": strings("t"),
+      "/r/app/build/intermediates/res/values/strings.xml": strings("gen"),
+      "/r/feature/budget/src/main/res/values/strings.xml": strings("x"),
+      "/r/lib/src/main/res/values/colors.xml":
+        '<resources><color name="c">#fff</color></resources>',
+      "/r/node_modules/pkg/res/values/strings.xml": strings("dep"),
+    });
+    const r = await detect(fs, "/r");
+    expect(r.candidates.map((c) => [c.target.path, c.confidence, c.strings, c.locales])).toEqual([
+      ["app/src/main/res", "high", 3, ["hi"]],
+      ["feature/budget/src/main/res", "high", 1, []],
+      ["app/src/debug/res", "medium", 1, []],
+    ]);
+    expect(r.candidates[2]?.questions[0]).toMatch(/debug/);
+    expect(r.sourceLocale).toMatchObject({ value: "en", confident: false });
+  });
+
+  it("groups gettext files by pattern and finds their templates", async () => {
+    const fs = memoryFs({
+      "/r/locale/de/LC_MESSAGES/django.po": po({ Hello: "Hallo" }),
+      "/r/locale/fr/LC_MESSAGES/django.po": po({ Hello: "Bonjour" }),
+      "/r/locale/de/LC_MESSAGES/djangojs.po": po({ Close: "Schließen" }),
+      "/r/languages/my-plugin.pot": po({ Save: "" }),
+      "/r/languages/my-plugin-de_DE.po": po({ Save: "Speichern" }),
+      "/r/languages/my-plugin-fr_FR.po": po({ Save: "Enregistrer" }),
+      "/r/docs/notes.po": po({ x: "y" }),
+    });
+    const r = await detect(fs, "/r");
+    const byPath = Object.fromEntries(r.candidates.map((c) => [c.target.path, c]));
+    expect(Object.keys(byPath).sort()).toEqual([
+      "languages/my-plugin-{locale}.po",
+      "locale/{locale}/LC_MESSAGES/django.po",
+      "locale/{locale}/LC_MESSAGES/djangojs.po",
+    ]);
+    expect(byPath["languages/my-plugin-{locale}.po"]?.target).toMatchObject({
+      template: "languages/my-plugin.pot",
+    });
+    expect(byPath["languages/my-plugin-{locale}.po"]?.locales).toEqual(["de-DE", "fr-FR"]);
+    expect(byPath["locale/{locale}/LC_MESSAGES/django.po"]?.confidence).toBe("high");
+    expect(byPath["locale/{locale}/LC_MESSAGES/djangojs.po"]?.confidence).toBe("medium");
+    expect(r.locales).toEqual(["de", "de-DE", "fr", "fr-FR"]);
+  });
+
+  it("finds a po/ folder with its template", async () => {
+    const fs = memoryFs({
+      "/r/po/messages.pot": po({ Hi: "" }),
+      "/r/po/es.po": po({ Hi: "Hola" }),
+    });
+    const [c] = (await detect(fs, "/r")).candidates;
+    expect(c?.target).toEqual({
+      format: "po",
+      path: "po/{locale}.po",
+      template: "po/messages.pot",
+    });
+    expect(c?.confidence).toBe("high");
+  });
+
+  it("reads the source language from String Catalogs and lists unsupported formats", async () => {
+    const fs = memoryFs({
+      "/r/.gitignore": "generated/\n",
+      "/r/App/Localizable.xcstrings": catalog("de", ["Hallo", "Tschüss"]),
+      "/r/generated/Other.xcstrings": catalog("en", ["x"]),
+      "/r/App/en.lproj/InfoPlist.strings": '"CFBundleName" = "App";',
+      "/r/lib/l10n/app_en.arb": "{}",
+      "/r/web/locales/en.json": "{}",
+      "/r/web/locales/fr.json": "{}",
+      "/r/web/data/en.json": "{}",
+    });
+    const r = await detect(fs, "/r");
+    expect(r.candidates.map((c) => c.target.path)).toEqual(["App/Localizable.xcstrings"]);
+    expect(r.sourceLocale).toEqual({
+      value: "de",
+      confident: true,
+      reason: "declared in the String Catalog",
+    });
+    expect(r.unsupported).toEqual([
+      { format: "Apple .strings", files: 1, examples: ["App/en.lproj/InfoPlist.strings"] },
+      { format: "Flutter ARB", files: 1, examples: ["lib/l10n/app_en.arb"] },
+      { format: "JSON", files: 2, examples: ["web/locales/en.json", "web/locales/fr.json"] },
+    ]);
+  });
+
+  it("suggests adding a String Catalog to an Xcode project that has none", async () => {
+    const fs = memoryFs({
+      "/r/App.xcodeproj/project.pbxproj": "// !$*UTF8*$!",
+      "/r/App/ContentView.swift": "",
+    });
+    const r = await detect(fs, "/r");
+    expect(r.candidates).toEqual([]);
+    expect(r.hints[0]).toMatch(/String Catalog/);
+  });
+});
+
+function io(answers: string[] = [], interactive = false): Io & { out: string[]; err: string[] } {
+  const out: string[] = [];
+  const err: string[] = [];
+  return {
+    out,
+    err,
+    interactive,
+    log: (l) => out.push(l),
+    error: (l) => err.push(l),
+    ask: async (_q, fallback) => answers.shift() || fallback,
+  };
+}
+
+describe("init", () => {
+  const repo = () =>
+    memoryFs({
+      "/r/app/src/main/res/values/strings.xml": strings("a", "b"),
+      "/r/app/src/main/res/values-ar/strings.xml": strings("a"),
+      "/r/wear/src/main/res/values/strings.xml": strings("w"),
+      "/r/locale/hi/LC_MESSAGES/django.po": po({ Hello: "नमस्ते" }),
+      "/r/locale/ar/LC_MESSAGES/django.po": po({ Hello: "مرحبا" }),
+    });
+
+  it("--yes writes a config the project can open, with ids where formats repeat", async () => {
+    const fs = repo();
+    const code = await runInit(fs, { cwd: "/r", yes: true }, io());
+    expect(code).toBe(0);
+    const config = parseYaml(fs.files.get("/r/l10n.config.yaml") ?? "");
+    expect(config).toEqual({
+      sourceLocale: "en",
+      locales: ["ar", "hi"],
+      targets: [
+        { id: "android-app", format: "android-xml", path: "app/src/main/res" },
+        { id: "android-wear", format: "android-xml", path: "wear/src/main/res" },
+        { format: "po", path: "locale/{locale}/LC_MESSAGES/django.po" },
+      ],
+    });
+    const project = await openProject(fs, { cwd: "/r" });
+    expect(project.targets.map((t) => t.target.id)).toEqual(["android-app", "android-wear", "po"]);
+  });
+
+  it("--accept and --locales pick exactly what's asked", async () => {
+    const fs = repo();
+    expect(await runInit(fs, { cwd: "/r", accept: [3], locales: ["hi"], source: "en" }, io())).toBe(
+      0,
+    );
+    expect(parseYaml(fs.files.get("/r/l10n.config.yaml") ?? "")).toEqual({
+      sourceLocale: "en",
+      locales: ["hi"],
+      targets: [{ format: "po", path: "locale/{locale}/LC_MESSAGES/django.po" }],
+    });
+  });
+
+  it("asks in a terminal", async () => {
+    const fs = repo();
+    const terminal = io(["1", "", "hi, ar"], true);
+    expect(await runInit(fs, { cwd: "/r" }, terminal)).toBe(0);
+    expect(parseYaml(fs.files.get("/r/l10n.config.yaml") ?? "")).toMatchObject({
+      locales: ["hi", "ar"],
+      targets: [{ format: "android-xml", path: "app/src/main/res" }],
+    });
+    expect(terminal.out.join("\n")).toContain("Found 3 localization setups");
+  });
+
+  it("won't write without consent when not in a terminal", async () => {
+    const fs = repo();
+    const quiet = io();
+    expect(await runInit(fs, { cwd: "/r" }, quiet)).toBe(2);
+    expect(fs.files.has("/r/l10n.config.yaml")).toBe(false);
+    expect(quiet.err[0]).toMatch(/--yes/);
+  });
+
+  it("never overwrites a config unless forced", async () => {
+    const fs = repo();
+    fs.files.set("/r/l10n.config.yaml", "mine");
+    expect(await runInit(fs, { cwd: "/r", yes: true }, io())).toBe(2);
+    expect(fs.files.get("/r/l10n.config.yaml")).toBe("mine");
+    expect(await runInit(fs, { cwd: "/r", yes: true, force: true }, io())).toBe(0);
+  });
+
+  it("rejects bad answers without writing", async () => {
+    const fs = repo();
+    const bad = io();
+    expect(await runInit(fs, { cwd: "/r", accept: [9] }, bad)).toBe(2);
+    expect(bad.err[0]).toMatch(/no setup 9/);
+    expect(await runInit(fs, { cwd: "/r", yes: true, locales: ["not a locale"] }, bad)).toBe(2);
+    expect(fs.files.has("/r/l10n.config.yaml")).toBe(false);
+  });
+
+  it("explains what to do when nothing is found", async () => {
+    const fs = memoryFs({ "/r/App.xcodeproj/project.pbxproj": "", "/r/lib/l10n/app_en.arb": "{}" });
+    const none = io();
+    expect(await runInit(fs, { cwd: "/r", yes: true }, none)).toBe(1);
+    expect(none.err[0]).toMatch(/String Catalog[\s\S]*Flutter ARB/);
+  });
+});

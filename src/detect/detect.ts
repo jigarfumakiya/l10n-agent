@@ -1,0 +1,329 @@
+import path from "node:path";
+import type { TargetConfig } from "../core/config.js";
+import type { FileSystem } from "../core/fs.js";
+import { LOCALE_TOKEN, parseLocaleSegment } from "../core/paths.js";
+import { openTarget } from "../core/project.js";
+import { walk } from "./walk.js";
+
+export type Confidence = "high" | "medium" | "low";
+
+export interface Candidate {
+  /** Ready to go into `targets:` in the config (without an id; init assigns ids). */
+  target: TargetConfig;
+  confidence: Confidence;
+  /** Why this was picked, in plain words. */
+  evidence: string[];
+  /** Translatable source strings, counted by the format's own reader. */
+  strings: number;
+  /** Locales with translations on disk (source excluded). */
+  locales: string[];
+  /** Source language the files declare, when they do (String Catalog `sourceLanguage`). */
+  sourceLocale?: string;
+  /** Things a person should confirm before this goes in the config. */
+  questions: string[];
+}
+
+export interface UnsupportedFind {
+  format: string;
+  files: number;
+  examples: string[];
+}
+
+export interface DetectResult {
+  root: string;
+  candidates: Candidate[];
+  /** Localization files found in formats that aren't supported yet. */
+  unsupported: UnsupportedFind[];
+  sourceLocale: { value: string; confident: boolean; reason: string };
+  /** Every locale with translations, across candidates. */
+  locales: string[];
+  /** Suggestions when a project looks localizable but has no translation files yet. */
+  hints: string[];
+  truncated: boolean;
+}
+
+const RANK: Record<Confidence, number> = { high: 0, medium: 1, low: 2 };
+
+export async function detect(fs: FileSystem, root: string): Promise<DetectResult> {
+  const { files, truncated } = await walk(fs, root);
+  const found: Candidate[] = [
+    ...(await detectAndroid(fs, root, files)),
+    ...(await detectPo(fs, root, files)),
+    ...(await detectXcstrings(fs, root, files)),
+  ];
+  const candidates = found.sort(
+    (a, b) => RANK[a.confidence] - RANK[b.confidence] || b.strings - a.strings,
+  );
+
+  const declared = [
+    ...new Set(candidates.flatMap((c) => (c.sourceLocale ? [c.sourceLocale] : []))),
+  ];
+  const sourceLocale =
+    declared.length === 1
+      ? { value: declared[0] as string, confident: true, reason: "declared in the String Catalog" }
+      : declared.length > 1
+        ? {
+            value: declared[0] as string,
+            confident: false,
+            reason: `catalogs disagree: ${declared.join(", ")}`,
+          }
+        : { value: "en", confident: false, reason: "assumed; the files don't say" };
+
+  const locales = [...new Set(candidates.flatMap((c) => c.locales))]
+    .filter((l) => l !== sourceLocale.value)
+    .sort();
+  const unsupported = detectUnsupported(files);
+  return {
+    root,
+    candidates,
+    unsupported,
+    sourceLocale,
+    locales,
+    hints: hints(files, candidates, unsupported),
+    truncated,
+  };
+}
+
+// ── Android ──────────────────────────────────────────────────────────────────
+
+async function detectAndroid(fs: FileSystem, root: string, files: string[]): Promise<Candidate[]> {
+  const resDirs = new Set<string>();
+  for (const f of files) {
+    const m = /^(.*\/)?res\/values\/[^/]+\.xml$/.exec(f);
+    if (m) resDirs.add(`${m[1] ?? ""}res`);
+  }
+  const out: Candidate[] = [];
+  for (const res of [...resDirs].sort()) {
+    const target: TargetConfig = { format: "android-xml", path: res };
+    const t = await openTarget(fs, root, target, "en", "android");
+    const strings = [...t.source.entries.values()].filter((e) => e.translatable).length;
+    if (strings === 0 && t.locales.size === 0) continue; // colors, dimens, themes only
+    const evidence = [`${res}/values has ${strings} string${strings === 1 ? "" : "s"}`];
+    const variant = /(^|\/)src\/([^/]+)\/res$/.exec(res)?.[2];
+    let confidence: Confidence = "high";
+    const questions: string[] = [];
+    if (variant && /test/i.test(variant)) continue;
+    if (variant && variant !== "main") {
+      confidence = "medium";
+      questions.push(`Strings for the "${variant}" build variant; include them?`);
+    }
+    if (strings === 0) confidence = "low";
+    if (t.locales.size)
+      evidence.push(
+        `translations in ${t.locales.size} locale folder${t.locales.size === 1 ? "" : "s"}`,
+      );
+    out.push({
+      target,
+      confidence,
+      evidence,
+      strings,
+      locales: [...t.locales.keys()].sort(),
+      questions,
+    });
+  }
+  return out;
+}
+
+// ── gettext ──────────────────────────────────────────────────────────────────
+
+/** `locale/de/LC_MESSAGES/django.po` → `locale/{locale}/LC_MESSAGES/django.po`. */
+export function poPattern(
+  file: string,
+): { pattern: string; locale: string; domain: string } | undefined {
+  const parts = file.split("/");
+  const name = parts.at(-1) as string;
+  const stem = name.replace(/\.po$/, "");
+  const whole = parseLocaleSegment(stem);
+  if (whole) {
+    return {
+      pattern: [...parts.slice(0, -1), `${LOCALE_TOKEN}.po`].join("/"),
+      locale: whole,
+      domain: parts.at(-2) ?? stem,
+    };
+  }
+  // WordPress style: `my-plugin-de_DE.po`
+  const dash = stem.lastIndexOf("-");
+  if (dash > 0) {
+    const tail = parseLocaleSegment(stem.slice(dash + 1));
+    if (tail) {
+      return {
+        pattern: [...parts.slice(0, -1), `${stem.slice(0, dash + 1)}${LOCALE_TOKEN}.po`].join("/"),
+        locale: tail,
+        domain: stem.slice(0, dash),
+      };
+    }
+  }
+  for (let i = parts.length - 2; i >= 0; i--) {
+    const locale = parseLocaleSegment(parts[i] as string);
+    if (locale) {
+      const pattern = [...parts.slice(0, i), LOCALE_TOKEN, ...parts.slice(i + 1)].join("/");
+      return { pattern, locale, domain: stem };
+    }
+  }
+  return undefined;
+}
+
+async function detectPo(fs: FileSystem, root: string, files: string[]): Promise<Candidate[]> {
+  const groups = new Map<string, { domain: string; locales: string[] }>();
+  for (const f of files.filter((x) => x.endsWith(".po"))) {
+    const p = poPattern(f);
+    if (!p) continue;
+    const g = groups.get(p.pattern) ?? { domain: p.domain, locales: [] };
+    g.locales.push(p.locale);
+    groups.set(p.pattern, g);
+  }
+  const pots = files.filter((x) => x.endsWith(".pot"));
+  const out: Candidate[] = [];
+  for (const [pattern, g] of groups) {
+    const base = pattern.slice(0, pattern.indexOf(LOCALE_TOKEN)).replace(/\/$/, "");
+    const near = (pot: string) => {
+      const dir = path.posix.dirname(pot);
+      return (
+        base === "" ||
+        dir === base ||
+        dir.startsWith(`${base}/`) ||
+        base.startsWith(`${dir}/`) ||
+        dir === "."
+      );
+    };
+    const named = pots.filter((pot) => path.posix.basename(pot, ".pot") === g.domain);
+    const candidates = named.length ? named : pots.filter(near);
+    const questions: string[] = [];
+    let template: string | undefined;
+    if (candidates.length === 1) template = candidates[0];
+    else if (candidates.length > 1) {
+      template = candidates.filter(near)[0] ?? candidates[0];
+      questions.push(
+        `Several templates could be the source: ${candidates.join(", ")}. Using ${template}.`,
+      );
+    }
+    const target: TargetConfig = { format: "po", path: pattern, ...(template ? { template } : {}) };
+    const t = await openTarget(fs, root, target, "en", "po");
+    const strings = t.source.entries.size;
+    if (strings === 0) continue;
+    const evidence = [
+      `${g.locales.length} .po file${g.locales.length === 1 ? "" : "s"} matching ${pattern}`,
+    ];
+    if (template) evidence.push(`template ${template}`);
+    const confidence: Confidence = g.locales.length >= 2 || template ? "high" : "medium";
+    if (confidence === "medium")
+      questions.push("Only one .po file and no template; is this the app's translations?");
+    out.push({
+      target,
+      confidence,
+      evidence,
+      strings,
+      locales: [...t.locales.keys()].sort(),
+      questions,
+    });
+  }
+  return out;
+}
+
+// ── Apple String Catalogs ────────────────────────────────────────────────────
+
+async function detectXcstrings(
+  fs: FileSystem,
+  root: string,
+  files: string[],
+): Promise<Candidate[]> {
+  const out: Candidate[] = [];
+  for (const f of files.filter((x) => x.endsWith(".xcstrings"))) {
+    const target: TargetConfig = { format: "xcstrings", path: f };
+    let declared: string | undefined;
+    try {
+      const doc = JSON.parse(await fs.readFile(path.join(root, f))) as { sourceLanguage?: unknown };
+      if (typeof doc.sourceLanguage === "string") declared = doc.sourceLanguage;
+    } catch {
+      // Reported below by the format's own reader, with a line number.
+    }
+    const t = await openTarget(fs, root, target, declared ?? "en", "xcstrings");
+    const error = t.issues.find((i) => i.severity === "error");
+    if (error) {
+      out.push({
+        target,
+        confidence: "low",
+        evidence: [
+          `${f} could not be read: ${error.message}${error.line ? ` (line ${error.line})` : ""}`,
+        ],
+        strings: 0,
+        locales: [],
+        questions: ["Fix the file, or leave it out"],
+      });
+      continue;
+    }
+    const strings = [...t.source.entries.values()].filter((e) => e.translatable).length;
+    out.push({
+      target,
+      confidence: "high",
+      evidence: [`String Catalog with ${strings} string${strings === 1 ? "" : "s"}`],
+      strings,
+      locales: [...t.locales.keys()].sort(),
+      ...(declared ? { sourceLocale: declared } : {}),
+      questions: [],
+    });
+  }
+  return out;
+}
+
+// ── Hints ────────────────────────────────────────────────────────────────────
+
+function hints(files: string[], candidates: Candidate[], unsupported: UnsupportedFind[]): string[] {
+  const out: string[] = [];
+  const has = (format: string) => candidates.some((c) => c.target.format === format);
+  const appleLegacy = unsupported.some((u) => u.format.startsWith("Apple"));
+  const xcode = files.some(
+    (f) =>
+      f.endsWith(".xcodeproj/project.pbxproj") || f === "project.yml" || f.endsWith("/project.yml"),
+  );
+  if (xcode && !has("xcstrings") && !appleLegacy) {
+    out.push(
+      "This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Then run detect again.",
+    );
+  }
+  const gradle = files.some((f) => /(^|\/)build\.gradle(\.kts)?$/.test(f));
+  if (
+    gradle &&
+    !has("android-xml") &&
+    files.some((f) => /\/src\/main\/AndroidManifest\.xml$/.test(f))
+  ) {
+    out.push(
+      "This looks like an Android project with no strings in res/values yet. Move UI text into res/values/strings.xml, then run detect again.",
+    );
+  }
+  return out;
+}
+
+// ── Recognized but not supported yet ─────────────────────────────────────────
+
+const I18N_DIR = /^(locales?|i18n|l10n|lang|langs|languages|translations|messages|intl)$/i;
+
+function detectUnsupported(files: string[]): UnsupportedFind[] {
+  const kinds = new Map<string, string[]>();
+  const add = (kind: string, f: string) => kinds.set(kind, [...(kinds.get(kind) ?? []), f]);
+  for (const f of files) {
+    const parts = f.split("/");
+    const name = parts.at(-1) as string;
+    const ext = path.posix.extname(name);
+    const stem = name.slice(0, name.length - ext.length);
+    const inI18nDir = parts.slice(0, -1).some((p) => I18N_DIR.test(p));
+    const localeNamed =
+      parseLocaleSegment(stem) !== undefined ||
+      parts.slice(0, -1).some((p) => parseLocaleSegment(p) !== undefined);
+    if (ext === ".strings" && parts.some((p) => p.endsWith(".lproj"))) add("Apple .strings", f);
+    else if (ext === ".stringsdict") add("Apple .stringsdict", f);
+    else if (ext === ".arb") add("Flutter ARB", f);
+    else if (ext === ".json" && inI18nDir && localeNamed) add("JSON", f);
+    else if ((ext === ".yml" || ext === ".yaml") && inI18nDir && localeNamed)
+      add("YAML (Rails)", f);
+    else if (ext === ".resx") add(".NET .resx", f);
+    else if (ext === ".properties" && /_[a-z]{2}(_[A-Z]{2})?$/.test(stem))
+      add("Java .properties", f);
+    else if (ext === ".xlf" || ext === ".xliff") add("XLIFF", f);
+  }
+  return [...kinds].map(([format, list]) => ({
+    format,
+    files: list.length,
+    examples: list.slice(0, 3),
+  }));
+}

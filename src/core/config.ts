@@ -122,7 +122,7 @@ export async function loadConfig(
     }
     if (!file)
       throw new ConfigError(
-        `No ${CONFIG_FILE} found in ${cwd} or its parents. Create one: https://github.com/jigarfumakiya/l10n-agent#quick-start`,
+        `No ${CONFIG_FILE} found in ${cwd} or its parents. Run \`l10n init\` to create one.`,
       );
   }
 

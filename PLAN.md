@@ -323,9 +323,19 @@ memory:
   - A missing form is a warning when the app falls back to `other`, or when the form is
     only used for fractions.
   - 115 tests pass.
+- **P2 `detect` and `init` done (2026-10-14):**
+  - Walks the repo, honoring `.gitignore` files at every level and skipping
+    build and dependency folders.
+  - Finds Android res folders, PO pattern groups with their templates, and String
+    Catalogs. Each candidate is loaded through its format's reader, so counts are real.
+  - Lists recognized but unsupported formats, and hints for Xcode projects that have
+    no catalog.
+  - `init` runs interactively, or with `--yes` / `--accept` / `--json`. It refuses to
+    write without a terminal or consent, and never overwrites a config without
+    `--force`.
+  - 132 tests pass.
 - **Next:**
-  - `detect` and `init` (auto-detect formats, ask when unsure).
-  - Then JSON and ARB.
+  - JSON and ARB.
   - Then String Catalog substitutions and device variations.
   - Then P4 (agent loop).
 
@@ -338,7 +348,7 @@ any project first. Day counts are rough focused-work estimates.
 | **P0 Foundations** ✅ | Repo, CI, layout, fixtures | CI green | — |
 | **P1 Core + Android** ✅ | model, android-xml read/write, checks, lock reading, `status` / `validate` | 0 false errors on AndroidX resources | — |
 | **P1b Formats** ✅ | Pluggable placeholders and plural models, path patterns; gettext PO, Apple String Catalog | Byte-for-byte round trip on Django and real Xcode catalogs | — |
-| **P2 Detect + init** | `l10n detect` (candidates with evidence and confidence), `l10n init` (interactive, `--json`, `--yes`) | Finds the right targets in sample Android, iOS, Django and Flutter repos | 2d |
+| **P2 Detect + init** ✅ | `l10n detect` (candidates with evidence and confidence), `l10n init` (interactive, `--json`, `--yes`) | Finds the right targets in sample Android, iOS, Django and Flutter repos | 2d |
 | **P3 More formats** | JSON (flat, nested, i18next, ICU), Flutter ARB; String Catalog substitutions and device variations | Round trip on real files | 4d |
 | **P4 Agent loop** | Lockfile writes, brief, voice, glossary, memory; `next-batch`, `submit`, drafts; skills `l10n-setup` + `l10n-translate` | An agent translates a sample app to `hi` and `ar` with 0 errors | 3d |
 | **P5 Extraction** | `scan-code` (Kotlin, Swift), `add-source`, key naming, usage context; skill `l10n-extract`; pseudolocale check | A real app goes from hardcoded text to resources | 5d |

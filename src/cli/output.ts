@@ -1,6 +1,7 @@
 import { displayKey, type Issue } from "../core/model.js";
 import type { Project } from "../core/project.js";
 import { ENTRY_STATES, type LocaleStatus } from "../core/status.js";
+import type { DetectResult } from "../detect/detect.js";
 
 const color = process.stdout.isTTY && !process.env.NO_COLOR;
 const paint = (code: number) => (s: string) => (color ? `\x1b[${code}m${s}\x1b[0m` : s);
@@ -73,4 +74,91 @@ export function printIssues(issues: Issue[]): void {
 function truncate(s: string, max: number): string {
   const one = s.replace(/\s+/g, " ");
   return one.length > max ? `${one.slice(0, max - 1)}…` : one;
+}
+
+const FORMAT_LABEL: Record<string, string> = {
+  "android-xml": "Android resources",
+  po: "gettext PO",
+  xcstrings: "String Catalog",
+};
+
+/** Human summary of `detect`, as lines. */
+export function describeDetect(result: DetectResult): string[] {
+  const n = result.candidates.length;
+  const lines = [
+    bold(`Found ${n} localization setup${n === 1 ? "" : "s"}`) + dim(` in ${result.root}`),
+    "",
+  ];
+  const rows = result.candidates.map((c, i) => [
+    `${i + 1}.`,
+    FORMAT_LABEL[c.target.format] ?? c.target.format,
+    c.target.path,
+    `${c.strings} string${c.strings === 1 ? "" : "s"}`,
+    c.locales.length ? c.locales.join(", ") : "no translations",
+    c.confidence,
+  ]);
+  const widths = [0, 1, 2, 3, 4].map((col) => Math.max(...rows.map((r) => (r[col] ?? "").length)));
+  result.candidates.forEach((c, i) => {
+    const r = rows[i] as string[];
+    const conf =
+      c.confidence === "high"
+        ? green(c.confidence)
+        : c.confidence === "medium"
+          ? yellow(c.confidence)
+          : red(c.confidence);
+    lines.push(
+      `  ${r
+        .slice(0, 5)
+        .map((cell, col) => cell.padEnd(widths[col] ?? 0))
+        .join("  ")}  ${conf}`,
+    );
+    const indent = " ".repeat((widths[0] ?? 2) + 4);
+    lines.push(dim(`${indent}${c.evidence.join(" · ")}`));
+    if (c.target.format === "po" && c.target.template === undefined)
+      lines.push(dim(`${indent}no .pot template; msgids are the source`));
+    for (const q of c.questions) lines.push(`${indent}${yellow("?")} ${q}`);
+  });
+  for (const h of result.hints) lines.push("", yellow(h));
+  const s = result.sourceLocale;
+  lines.push("", `Source language: ${bold(s.value)}${dim(` (${s.reason})`)}`);
+  if (result.unsupported.length) {
+    lines.push("", dim("Also found, not supported yet:"));
+    for (const u of result.unsupported) {
+      lines.push(
+        dim(
+          `  · ${u.format}: ${u.files} file${u.files === 1 ? "" : "s"} (${u.examples.join(", ")}${u.files > u.examples.length ? ", …" : ""})`,
+        ),
+      );
+    }
+  }
+  if (result.truncated)
+    lines.push(
+      "",
+      yellow("Stopped after 50,000 files; run in a narrower folder with --cwd to see everything."),
+    );
+  return lines;
+}
+
+/** What `detect` and `init` say when nothing supported is found. */
+export function describeNone(result: DetectResult): string[] {
+  const lines = [
+    `No supported translation files found in ${result.root}.`,
+    dim("Supported: Android res/values*/strings.xml, gettext .po/.pot, Apple .xcstrings."),
+  ];
+  for (const h of result.hints) lines.push("", h);
+  if (result.unsupported.length) {
+    lines.push("", "Found, but not supported yet:");
+    for (const u of result.unsupported) {
+      lines.push(
+        `  · ${u.format}: ${u.files} file${u.files === 1 ? "" : "s"} (${u.examples.join(", ")})`,
+      );
+    }
+  }
+  lines.push(
+    "",
+    dim(
+      "You can also write l10n.config.yaml by hand: https://github.com/jigarfumakiya/l10n-agent#configuration",
+    ),
+  );
+  return lines;
 }

@@ -8,8 +8,8 @@ Apple String Catalogs), checks every translation against its source with strict 
 writes changes back without disturbing anything else in the file. It is built to be driven by
 any AI coding agent or model, from the CLI, an MCP server, or CI.
 
-> **Status: early development.** Reading, checking (`validate`) and progress (`status`) work
-> today for three formats. Translating with a model, the MCP server and agent skills come next.
+> **Status: early development.** Setup (`detect`, `init`), checking (`validate`) and progress
+> (`status`) work today for three formats. Translating with a model, the MCP server and agent skills come next.
 > See [Roadmap](#roadmap), [PLAN.md](PLAN.md) for the full plan, and [RESEARCH.md](RESEARCH.md)
 > for how this compares to paid tools.
 
@@ -40,7 +40,33 @@ npm link          # puts `l10n` on your PATH; or run `node dist/cli.js`
 
 ## Quick start
 
-Add `l10n.config.yaml` to your project root. Each target is one set of translation files:
+In your project:
+
+```sh
+l10n init        # finds your translation files and writes l10n.config.yaml
+l10n status      # translation progress per locale
+l10n validate    # every check; exits 1 on errors, so it can gate CI
+```
+
+`init` scans the repo, skipping build output, dependencies and anything in `.gitignore`. It shows
+what it found and asks which setups to keep, the source language and the languages to translate
+into. It never overwrites an existing config unless you pass `--force`.
+
+```
+$ l10n init
+Found 2 localization setups in ~/my-app
+
+  1.  Android resources  app/src/main/res                       312 strings  hi, ar  high
+      app/src/main/res/values has 312 strings · translations in 2 locale folders
+  2.  gettext PO         locale/{locale}/LC_MESSAGES/django.po  140 strings  de, fr  high
+      2 .po files matching locale/{locale}/LC_MESSAGES/django.po · template locale/django.pot
+
+Source language: en (assumed; the files don't say)
+
+Add which setups? [1,2]
+```
+
+The config it writes looks like this, and you can also write it by hand:
 
 ```yaml
 sourceLocale: en
@@ -56,13 +82,6 @@ targets:
 
   - format: xcstrings
     path: App/Localizable.xcstrings                # one file holds every language
-```
-
-Then:
-
-```sh
-l10n status      # translation progress per locale
-l10n validate    # every check; exits 1 on errors, so it can gate CI
 ```
 
 ```
@@ -84,6 +103,8 @@ $ l10n validate
 
 | Command | What it does |
 |---|---|
+| `l10n detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
+| `l10n init` | Detects, asks, and writes `l10n.config.yaml` |
 | `l10n status` | Progress per target and locale |
 | `l10n validate` | Runs every check. Exit code 1 if there are errors |
 
@@ -91,11 +112,31 @@ Options:
 
 | Option | Applies to | Meaning |
 |---|---|---|
-| `--json` | both | Machine-readable output for agents and scripts |
-| `-l, --locale hi,ar` | both | Only these locales |
+| `--json` | all | Machine-readable output for agents and scripts |
+| `-l, --locale hi,ar` | `status`, `validate` | Only these locales |
 | `--strict` | `validate` | Untranslated strings and missing locales count as errors |
+| `-y, --yes` | `init` | Accept the detected setups without asking |
+| `--accept 1,2` | `init` | Only these setups (numbers from `detect`) |
+| `--source en` | `init` | Source language (default: declared in a String Catalog, else `en`) |
+| `-l, --locales hi,ar` | `init` | Languages to translate into (default: those found on disk) |
+| `--force` | `init` | Replace an existing `l10n.config.yaml` |
 | `-c, --config <file>` | all | Config file (default: the nearest `l10n.config.yaml`) |
 | `-C, --cwd <dir>` | all | Directory to run in |
+
+### Detection
+
+- **What it finds:** Android `res` folders with strings, groups of `.po` files sharing a path
+  pattern (with their `.pot` template), and `.xcstrings` catalogs.
+- **Real counts:** each candidate is loaded with the same reader `status` uses, so its string
+  count and languages are real.
+- **Confidence:** each candidate is `high`, `medium` (for example a build-variant folder, or a
+  single `.po` file with no template) or `low`. Doubts are listed as questions.
+- **Unsupported formats:** files it recognizes but can't read yet (`.strings`, ARB, JSON, YAML,
+  `.resx`, `.properties`, XLIFF) are listed, so nothing is ignored silently.
+- **Hints:** an Xcode project without a String Catalog gets told how to add one.
+- **In agents and CI:** without a terminal, `init` writes only with `--yes` or `--accept`. An
+  agent can run `l10n detect --json`, show the user the options, then run
+  `l10n init --accept 1 --locales hi,ar`.
 
 ### Status columns
 
@@ -198,11 +239,10 @@ upstream bugs, including a Python placeholder in Django's Irish translation that
 
 ## Roadmap
 
-1. **`l10n init` / `l10n detect`.** Scan a repo, propose the translation files it finds, and ask only when unsure.
-2. **More formats:** JSON (i18next, ICU), Flutter ARB, String Catalog substitutions and device variations.
-3. **Translation.** Batches of strings with full context go to your agent's model, or to a provider in CI. Every result is checked before it is written, and drafts are reviewed before approval.
-4. **Agent surfaces:** skills (`SKILL.md`), an MCP server and a GitHub Action.
-5. **Quality:** an AI reviewer, a static review page for people, and visual checks for truncated or right-to-left layouts.
+1. **More formats:** JSON (i18next, ICU), Flutter ARB, String Catalog substitutions and device variations.
+2. **Translation.** Batches of strings with full context go to your agent's model, or to a provider in CI. Every result is checked before it is written, and drafts are reviewed before approval.
+3. **Agent surfaces:** skills (`SKILL.md`), an MCP server and a GitHub Action.
+4. **Quality:** an AI reviewer, a static review page for people, and visual checks for truncated or right-to-left layouts.
 
 The details are in [PLAN.md](PLAN.md).
 
@@ -220,6 +260,7 @@ Layout:
 ```
 src/core/        config, project loading, checks, status, lockfile, placeholders, plural rules
 src/formats/     one folder per format; each opens a Target (read, check, write)
+src/detect/      repo walk, per-format detection, config building for `init`
 src/cli/         the `l10n` command
 fixtures/        sample projects with deliberate mistakes, one per format
 test/            vitest suites

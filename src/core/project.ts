@@ -38,9 +38,8 @@ export async function openProject(
   const lockFile = path.resolve(root, config.lock);
   const targets: ProjectTarget[] = [];
   for (const t of config.targets) {
-    const adapter = ADAPTERS[t.format] as FormatAdapter<TargetConfig>;
-    const ctx = { fs, root, sourceLocale: config.sourceLocale, id: targetId(t, config.targets) };
-    targets.push({ config: t, target: await adapter.open(t, ctx) });
+    const target = await openTarget(fs, root, t, config.sourceLocale, targetId(t, config.targets));
+    targets.push({ config: t, target });
   }
   return {
     config,
@@ -51,6 +50,18 @@ export async function openProject(
     targets,
     fs,
   };
+}
+
+/** Opens one target with its format's adapter. */
+export function openTarget(
+  fs: FileSystem,
+  root: string,
+  config: TargetConfig,
+  sourceLocale: string,
+  id: string,
+): Promise<Target> {
+  const adapter = ADAPTERS[config.format] as FormatAdapter<TargetConfig>;
+  return adapter.open(config, { fs, root, sourceLocale, id });
 }
 
 /** Locales to work on: the configured ones, or every locale found on disk if none are configured. */
