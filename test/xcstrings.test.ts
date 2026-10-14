@@ -155,7 +155,7 @@ describe("xcstrings adapter", async () => {
 
   it("adds localizations to an entry that had none", async () => {
     const fs = memoryFs({
-      "/a/l10n.config.yaml": "targets:\n  - format: xcstrings\n    path: L.xcstrings\n",
+      "/a/localship.yaml": "targets:\n  - format: xcstrings\n    path: L.xcstrings\n",
       "/a/L.xcstrings":
         '{\n  "sourceLanguage" : "en",\n  "strings" : {\n    "Done" : {\n\n    }\n  },\n  "version" : "1.0"\n}',
     });

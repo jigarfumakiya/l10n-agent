@@ -1,7 +1,7 @@
-# Contributing to l10n-agent
+# Contributing to Localship
 
 Thanks for helping. Issues and pull requests are welcome at
-https://github.com/jigarfumakiya/l10n-agent.
+https://github.com/jigarfumakiya/localship.
 
 ## Development setup
 
@@ -20,8 +20,8 @@ src/formats/     one folder per format; each opens a Target (read, check, write)
 src/detect/      repo walk, per-format detection, config building for `init`
 src/translate/   prompts, model providers, the delegated translate loop
 src/mcp/         the MCP server
-src/cli/         the `l10n` command
-skills/          agent skills: l10n-setup, l10n-extract, l10n-translate, l10n-review
+src/cli/         the `localship` command
+skills/          agent skills: localship-setup, localship-extract, localship-translate, localship-review
 docs/            the reference
 .claude-plugin/  Claude Code plugin and marketplace manifests
 examples/        a sample app translated with the tool

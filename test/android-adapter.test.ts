@@ -62,7 +62,7 @@ describe("android adapter", () => {
 
   it("splices changes into an existing file, keeping comments and layout", async () => {
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/app/localship.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/app/res/values/strings.xml":
         '<resources>\n  <string name="a">A</string>\n  <string name="b">B</string>\n  <plurals name="d"><item quantity="one">%d day</item><item quantity="other">%d days</item></plurals>\n  <string name="c">C</string>\n</resources>\n',
       "/app/res/values-hi/strings.xml":
@@ -91,7 +91,7 @@ describe("android adapter", () => {
   it("adds new keys in source order and keeps keys it was not given", async () => {
     const root = "/app";
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/app/localship.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/app/res/values/strings.xml":
         '<resources>\n  <string name="a">A</string>\n  <string name="b">B</string>\n  <string name="c">C</string>\n</resources>\n',
       "/app/res/values-hi/strings.xml":
@@ -113,7 +113,7 @@ describe("android adapter", () => {
 
   it("reports malformed files and duplicate keys with lines", async () => {
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "targets:\n  - format: android-xml\n    path: res\n",
+      "/app/localship.yaml": "targets:\n  - format: android-xml\n    path: res\n",
       "/app/res/values/strings.xml":
         '<resources>\n<string name="a">A</string>\n<string name="a">B</string>\n</resources>',
       "/app/res/values-hi/strings.xml":
@@ -139,7 +139,7 @@ describe("android performance", () => {
     const body = (f: (i: number) => string) =>
       `<resources>\n${Array.from({ length: n }, (_, i) => `    <string name="k${i}">${f(i)}</string>`).join("\n")}\n</resources>\n`;
     const fs = memoryFs({
-      "/big/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/big/localship.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/big/res/values/strings.xml": body((i) => `Value ${i} with %1$s`),
       "/big/res/values-hi/strings.xml": body((i) => `मान ${i} %1$s`),
     });

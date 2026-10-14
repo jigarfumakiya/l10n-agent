@@ -81,7 +81,7 @@ function suggestId(t: TargetConfig): string {
 
 export function renderConfig(config: ReturnType<typeof buildConfig>): string {
   const doc = new Document(config);
-  doc.commentBefore = ` l10n-agent configuration, written by \`l10n init\`.\n Docs: https://github.com/jigarfumakiya/l10n-agent/blob/main/docs/reference.md#configuration`;
+  doc.commentBefore = ` localship configuration, written by \`localship init\`.\n Docs: https://github.com/jigarfumakiya/localship/blob/main/docs/reference.md#configuration`;
   return doc.toString({ lineWidth: 0 });
 }
 

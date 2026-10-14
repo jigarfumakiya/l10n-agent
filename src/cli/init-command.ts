@@ -1,5 +1,5 @@
 import path from "node:path";
-import { CONFIG_FILE } from "../core/config.js";
+import { CONFIG_FILE, LEGACY_CONFIG_FILE } from "../core/config.js";
 import type { FileSystem } from "../core/fs.js";
 import { detect } from "../detect/detect.js";
 import {
@@ -29,12 +29,18 @@ export interface Io {
   ask: (question: string, fallback: string) => Promise<string>;
 }
 
-/** `l10n init`. Returns the process exit code. */
+/** `localship init`. Returns the process exit code. */
 export async function runInit(fs: FileSystem, opts: InitOptions, io: Io): Promise<number> {
   const root = path.resolve(opts.cwd);
   const file = path.join(root, CONFIG_FILE);
   if ((await fs.exists(file)) && !opts.force) {
     io.error(`${CONFIG_FILE} already exists in ${root}. Use --force to replace it.`);
+    return 2;
+  }
+  if (await fs.exists(path.join(root, LEGACY_CONFIG_FILE))) {
+    io.error(
+      `${LEGACY_CONFIG_FILE} already sets this project up, and Localship still reads it. Rename it to ${CONFIG_FILE} if you like; nothing else needs to change.`,
+    );
     return 2;
   }
 
@@ -92,7 +98,9 @@ export async function runInit(fs: FileSystem, opts: InitOptions, io: Io): Promis
       if (config.locales.length === 0) {
         io.log("No target languages yet: add some under `locales:`.");
       }
-      io.log("Next: `l10n status` to see progress, `l10n validate` to check translations.");
+      io.log(
+        "Next: `localship status` to see progress, `localship validate` to check translations.",
+      );
     }
     return 0;
   } catch (e) {

@@ -47,7 +47,7 @@ export function modelFor(project: Project, locale: string, override?: string): s
   const model = models[locale] ?? models[locale.split("-")[0] as string] ?? models.default;
   if (!model) {
     throw new UserError(
-      "No model to translate with. Pass --model provider:model (e.g. anthropic:claude-sonnet-5-5), or set models.default in l10n.config.yaml.",
+      "No model to translate with. Pass --model provider:model (e.g. anthropic:claude-sonnet-5-5), or set models.default in localship.yaml.",
     );
   }
   return model;

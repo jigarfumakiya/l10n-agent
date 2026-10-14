@@ -44,10 +44,10 @@ const statesArg = z.array(z.enum(ENTRY_STATES)).optional();
 export function createServer(opts: ServerOptions): McpServer {
   const fs = opts.fs ?? nodeFs;
   const server = new McpServer(
-    { name: "l10n-agent", version: opts.version },
+    { name: "localship", version: opts.version },
     {
       instructions:
-        "Localization for app projects (Android XML, gettext PO, Apple String Catalogs). Start with l10n_status; if there's no config, l10n_detect then l10n_init. Translate with l10n_next_batch → l10n_submit until nothing remains, then l10n_validate. Never edit translation files by hand when these tools can do it.",
+        "Localization for app projects (Android XML, gettext PO, Apple String Catalogs). Start with localship_status; if there's no config, localship_detect then localship_init. Translate with localship_next_batch → localship_submit until nothing remains, then localship_validate. Never edit translation files by hand when these tools can do it.",
     },
   );
   const dir = (cwd?: string) => path.resolve(opts.cwd, cwd ?? ".");
@@ -76,7 +76,7 @@ export function createServer(opts: ServerOptions): McpServer {
     );
 
   tool(
-    "l10n_status",
+    "localship_status",
     "Translation progress per target and locale: how many strings are missing, stale, drafts, approved… Call this first.",
     { cwd: cwdArg, locales: localesArg },
     async ({ cwd, locales }) => {
@@ -95,7 +95,7 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_validate",
+    "localship_validate",
     "Deterministic checks on source strings and translations: placeholders, plural forms, escaping, markup, glossary. ok is false when there are errors.",
     {
       cwd: cwdArg,
@@ -113,7 +113,7 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_detect",
+    "localship_detect",
     "Find translation files in a repo (Android res folders, .po files, String Catalogs) without writing anything.",
     { cwd: cwdArg },
     async ({ cwd }) => detect(fs, dir(cwd)),
@@ -121,14 +121,14 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_init",
-    "Write l10n.config.yaml from what l10n_detect found. Ask the user which setups and languages they want first.",
+    "localship_init",
+    "Write localship.yaml from what localship_detect found. Ask the user which setups and languages they want first.",
     {
       cwd: cwdArg,
       accept: z
         .array(z.number().int().min(1))
         .optional()
-        .describe("Setup numbers from l10n_detect (default: the confident ones)"),
+        .describe("Setup numbers from localship_detect (default: the confident ones)"),
       source: z.string().optional().describe("Source language (default: detected)"),
       locales: z.array(z.string()).describe("Languages to translate into"),
       force: z.boolean().optional().describe("Replace an existing config"),
@@ -152,7 +152,7 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_add_locales",
+    "localship_add_locales",
     "Add languages to translate into (BCP 47 codes such as hi, ar, pt-BR) to the project config.",
     { cwd: cwdArg, locales: z.array(z.string()).min(1) },
     async ({ cwd, locales }) => {
@@ -162,7 +162,7 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_get_context",
+    "localship_get_context",
     "The project's translation brief, voice per locale and glossary.",
     { cwd: cwdArg },
     async ({ cwd }) => {
@@ -173,7 +173,7 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_update_context",
+    "localship_update_context",
     `Write the brief (${CONTEXT_FILES.brief}: what the app is, audience, tone), voice per locale (voice/<locale>.md, or voice/all.md for every locale) and/or the glossary (replaces the whole list). Use when you can't edit files directly.`,
     {
       cwd: cwdArg,
@@ -198,8 +198,8 @@ export function createServer(opts: ServerOptions): McpServer {
   );
 
   tool(
-    "l10n_next_batch",
-    `The next strings that need translating, with everything needed to translate them well. Translate them yourself, then send them to l10n_submit. Repeat until remaining is 0.
+    "localship_next_batch",
+    `The next strings that need translating, with everything needed to translate them well. Translate them yourself, then send them to localship_submit. Repeat until remaining is 0.
 
 Rules:
 ${TRANSLATION_RULES}`,
@@ -217,7 +217,7 @@ ${TRANSLATION_RULES}`,
   );
 
   tool(
-    "l10n_submit",
+    "localship_submit",
     "Check translations and write the ones without errors as drafts. Rejected ones come back with the errors to fix; resubmit just those. value is a string, an object of plural forms, or an array, matching the item's kind.",
     {
       cwd: cwdArg,
@@ -235,7 +235,7 @@ ${TRANSLATION_RULES}`,
   );
 
   tool(
-    "l10n_approve",
+    "localship_approve",
     "Mark drafts approved (or reviewed). Only when the user says so, after they've seen the translations.",
     {
       cwd: cwdArg,
@@ -253,7 +253,7 @@ ${TRANSLATION_RULES}`,
   );
 
   tool(
-    "l10n_remove",
+    "localship_remove",
     "Make translations untranslated again (e.g. reject bad drafts) so they get redone. Pass keys, states, or both. Hand edits and reviewed, approved or untracked translations are kept unless force is set; set it only when the user asks.",
     {
       cwd: cwdArg,
@@ -269,7 +269,7 @@ ${TRANSLATION_RULES}`,
   );
 
   tool(
-    "l10n_prune",
+    "localship_prune",
     "Remove translations of strings that were deleted, renamed or marked not translatable, and their lockfile records. Use dryRun first and show the user.",
     { cwd: cwdArg, targets: targetsArg, dryRun: z.boolean().optional() },
     async ({ cwd, ...o }) => prune(await project(cwd), o),
@@ -277,8 +277,8 @@ ${TRANSLATION_RULES}`,
   );
 
   tool(
-    "l10n_translate",
-    "Translate everything missing with a separate model API (configured under models: in l10n.config.yaml, or pass model as provider:model). Use for large catalogs; needs the provider's API key in the environment.",
+    "localship_translate",
+    "Translate everything missing with a separate model API (configured under models: in localship.yaml, or pass model as provider:model). Use for large catalogs; needs the provider's API key in the environment.",
     {
       cwd: cwdArg,
       locales: localesArg,
@@ -289,7 +289,12 @@ ${TRANSLATION_RULES}`,
     async ({ cwd, targets, ...o }) => translateProject(await project(cwd), { ...o, targets }),
   );
 
-  for (const name of ["l10n-setup", "l10n-extract", "l10n-translate", "l10n-review"] as const) {
+  for (const name of [
+    "localship-setup",
+    "localship-extract",
+    "localship-translate",
+    "localship-review",
+  ] as const) {
     const skill = readSkill(name);
     if (!skill) continue;
     server.registerPrompt(name, { description: skill.description }, () => ({

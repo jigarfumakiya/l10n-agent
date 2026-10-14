@@ -1,6 +1,6 @@
 import type { Batch, BatchItem, MessageValue } from "../core/workflow.js";
 
-/** The rules every translator gets, whether it's `l10n translate` or an agent using the CLI or MCP. */
+/** The rules every translator gets, whether it's `localship translate` or an agent using the CLI or MCP. */
 export const TRANSLATION_RULES = `- Translate the source text of each item into the item's locale. Write what a native speaker would put in a well-made app: natural, concise UI language, not a word-for-word copy.
 - Follow the brief and the locale's voice. Work out where each text appears and what it does from its comment, context, and usage: the code that shows it, whose file path names the screen and whose code shows whether it is a button, title, label, hint or message.
 - Keep every placeholder exactly as written (%s, %1$s, %d, %@, {name}, %(count)d…). You may move them to fit the grammar; numbered ones (%1$s) may be reordered freely.

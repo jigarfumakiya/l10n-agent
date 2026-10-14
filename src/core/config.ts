@@ -5,7 +5,9 @@ import { UserError } from "./errors.js";
 import type { FileSystem } from "./fs.js";
 import { PLACEHOLDER_SYNTAXES } from "./placeholders.js";
 
-export const CONFIG_FILE = "l10n.config.yaml";
+export const CONFIG_FILE = "localship.yaml";
+/** The name before the project was called Localship; still read, with its `.l10n` folder. */
+export const LEGACY_CONFIG_FILE = "l10n.config.yaml";
 
 const locale = z.string().transform((s, ctx) => {
   try {
@@ -62,10 +64,10 @@ export const ConfigSchema = z
         ]),
       )
       .min(1, "Add at least one target"),
-    lock: z.string().default(".l10n/lock.json"),
+    lock: z.string().default(".localship/lock.json"),
     /** Folder with brief.md, voice/<locale>.md and glossary.yaml. */
-    context: z.string().default(".l10n"),
-    /** Models for `l10n translate`, as `provider:model`: `default`, or per locale. */
+    context: z.string().default(".localship"),
+    /** Models for `localship translate`, as `provider:model`: `default`, or per locale. */
     models: z.record(z.string(), z.string()).optional(),
     /** Extra OpenAI-compatible providers, by name. */
     providers: z
@@ -165,7 +167,7 @@ export interface LoadedConfig {
   file: string;
 }
 
-/** Finds `l10n.config.yaml` in `cwd` or the nearest parent, unless a path is given. */
+/** Finds `localship.yaml` in `cwd` or the nearest parent, unless a path is given. */
 export async function loadConfig(
   fs: FileSystem,
   cwd: string,
@@ -176,17 +178,19 @@ export async function loadConfig(
     file = path.resolve(cwd, explicit);
     if (!(await fs.exists(file))) throw new ConfigError(`Config not found: ${file}`);
   } else {
-    for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
-      const candidate = path.join(dir, CONFIG_FILE);
-      if (await fs.exists(candidate)) {
-        file = candidate;
-        break;
+    search: for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
+      for (const name of [CONFIG_FILE, LEGACY_CONFIG_FILE]) {
+        const candidate = path.join(dir, name);
+        if (await fs.exists(candidate)) {
+          file = candidate;
+          break search;
+        }
       }
       if (path.dirname(dir) === dir) break;
     }
     if (!file)
       throw new ConfigError(
-        `No ${CONFIG_FILE} found in ${cwd} or its parents. Run \`l10n init\` to create one.`,
+        `No ${CONFIG_FILE} found in ${cwd} or its parents. Run \`localship init\` to create one.`,
       );
   }
 
@@ -195,6 +199,9 @@ export async function loadConfig(
     raw = parseYaml(await fs.readFile(file));
   } catch (e) {
     throw new ConfigError(`${file}: ${(e as Error).message}`);
+  }
+  if (path.basename(file) === LEGACY_CONFIG_FILE && raw && typeof raw === "object") {
+    raw = { lock: ".l10n/lock.json", context: ".l10n", ...raw };
   }
   const parsed = ConfigSchema.safeParse(raw ?? {});
   if (!parsed.success) {

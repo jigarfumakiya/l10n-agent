@@ -9,7 +9,7 @@ import { modelFor, translateProject } from "../src/translate/translate.js";
 
 const files = (config = "") =>
   memoryFs({
-    "/p/l10n.config.yaml": `locales: [hi, ar]\ntargets:\n  - format: android-xml\n    path: res\n${config}`,
+    "/p/localship.yaml": `locales: [hi, ar]\ntargets:\n  - format: android-xml\n    path: res\n${config}`,
     "/p/res/values/strings.xml": `<resources>
     <string name="save">Save</string>
     <string name="greeting">Hi %1$s</string>
@@ -66,7 +66,7 @@ describe("translateProject", () => {
       ["hi", 3],
       ["ar", 3],
     ]);
-    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    const lock = JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}");
     expect(lock.targets.android.ar.items.model).toBe("fake:model");
   });
 

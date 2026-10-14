@@ -5,12 +5,12 @@ import { emptyLock, readLock, setLockEntry, writeLock } from "../src/core/lock.j
 
 describe("lockfile", () => {
   it("is empty when missing", async () => {
-    expect(await readLock(memoryFs(), "/a/.l10n/lock.json")).toEqual(emptyLock());
+    expect(await readLock(memoryFs(), "/a/.localship/lock.json")).toEqual(emptyLock());
   });
 
   it("explains a corrupt file instead of crashing", async () => {
-    const fs = memoryFs({ "/a/.l10n/lock.json": '{"version":1, broken' });
-    const err = await readLock(fs, "/a/.l10n/lock.json").catch((e: Error) => e);
+    const fs = memoryFs({ "/a/.localship/lock.json": '{"version":1, broken' });
+    const err = await readLock(fs, "/a/.localship/lock.json").catch((e: Error) => e);
     expect(err).toBeInstanceOf(UserError);
     expect((err as Error).message).toMatch(
       /lock\.json is not valid JSON[\s\S]*delete it to start over/,

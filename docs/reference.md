@@ -1,4 +1,4 @@
-# l10n-agent reference
+# Localship reference
 
 Everything the tool does, in detail. For getting started, see the [README](../README.md).
 
@@ -16,18 +16,18 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 
 | Command | What it does |
 |---|---|
-| `l10n detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
-| `l10n init` | Detects, asks, and writes `l10n.config.yaml` |
-| `l10n status` | Progress per target and locale |
-| `l10n add-locale fr,de` | Adds languages to `locales:` in the config, keeping its comments |
-| `l10n validate` | Runs every check. Exit code 1 if there are errors |
-| `l10n next-batch` | The next strings needing translation, with context, as JSON |
-| `l10n submit [file]` | Checks translations (JSON from a file or stdin) and writes the good ones as drafts. Exit code 1 if any are rejected |
-| `l10n translate` | Translates with a model API, through the same checks |
-| `l10n approve` | Marks drafts approved (or `--reviewed`) |
-| `l10n remove` | Makes translations untranslated again (`--keys`, `--states draft`), e.g. to reject bad drafts. A person's work needs `--force` |
-| `l10n prune` | Removes translations of strings that were deleted, renamed or marked not translatable, and their lockfile records |
-| `l10n mcp` | Runs the MCP server over stdio |
+| `localship detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
+| `localship init` | Detects, asks, and writes `localship.yaml` |
+| `localship status` | Progress per target and locale |
+| `localship add-locale fr,de` | Adds languages to `locales:` in the config, keeping its comments |
+| `localship validate` | Runs every check. Exit code 1 if there are errors |
+| `localship next-batch` | The next strings needing translation, with context, as JSON |
+| `localship submit [file]` | Checks translations (JSON from a file or stdin) and writes the good ones as drafts. Exit code 1 if any are rejected |
+| `localship translate` | Translates with a model API, through the same checks |
+| `localship approve` | Marks drafts approved (or `--reviewed`) |
+| `localship remove` | Makes translations untranslated again (`--keys`, `--states draft`), e.g. to reject bad drafts. A person's work needs `--force` |
+| `localship prune` | Removes translations of strings that were deleted, renamed or marked not translatable, and their lockfile records |
+| `localship mcp` | Runs the MCP server over stdio |
 
 Options:
 
@@ -46,15 +46,15 @@ Options:
 | `--strict` | `validate` | Untranslated strings and missing locales count as errors |
 | `-y, --yes`, `--accept 1,2` | `init` | Accept the detected setups, or only these |
 | `--source en`, `-l, --locales hi,ar` | `init` | Source language and languages to translate into |
-| `-c, --config <file>` | all | Config file (default: the nearest `l10n.config.yaml`) |
+| `-c, --config <file>` | all | Config file (default: the nearest `localship.yaml`) |
 | `-C, --cwd <dir>` | all | Directory to run in |
 
 ## MCP tools
 
-`l10n_status`, `l10n_validate`, `l10n_detect`, `l10n_init`, `l10n_add_locales`, `l10n_get_context`,
-`l10n_update_context`, `l10n_next_batch`, `l10n_submit`, `l10n_approve`, `l10n_remove`, `l10n_prune`,
-`l10n_translate`.
-The skills are also served as MCP prompts (`l10n-setup`, `l10n-extract`, `l10n-translate`, `l10n-review`) for
+`localship_status`, `localship_validate`, `localship_detect`, `localship_init`, `localship_add_locales`, `localship_get_context`,
+`localship_update_context`, `localship_next_batch`, `localship_submit`, `localship_approve`, `localship_remove`, `localship_prune`,
+`localship_translate`.
+The skills are also served as MCP prompts (`localship-setup`, `localship-extract`, `localship-translate`, `localship-review`) for
 clients that don't read skills. Every tool takes an optional `cwd`. Without one, the server works in the project Claude Code
 names in `CLAUDE_PROJECT_DIR`, else the directory it was started in (or `-C <dir>`).
 
@@ -66,8 +66,8 @@ Every translation, from any source, goes through the same loop:
 next-batch → translate → submit (checked; good ones written as drafts) → review → approve
 ```
 
-**With your coding agent.** The `l10n-translate` skill (or the `l10n_next_batch` and
-`l10n_submit` MCP tools) has the agent's own model do the translating. Each batch item comes
+**With your coding agent.** The `localship-translate` skill (or the `localship_next_batch` and
+`localship_submit` MCP tools) has the agent's own model do the translating. Each batch item comes
 with what a translator needs:
 
 ```json
@@ -93,7 +93,7 @@ retranslated.
 
 `submit` runs the same checks as `validate`. Translations with errors come back with the
 reasons and are not written. The agent fixes those and resubmits. Accepted ones become drafts,
-recorded in `.l10n/lock.json` with the model that made them. Android apostrophes, quotes and `&`
+recorded in `.localship/lock.json` with the model that made them. Android apostrophes, quotes and `&`
 are escaped for you. A finished example, translated into Hindi and Arabic this way, is in
 [examples/android-notes](../examples/android-notes).
 
@@ -101,7 +101,7 @@ are escaped for you. A finished example, translated into Hindi and Arabic this w
 
 ```sh
 export ANTHROPIC_API_KEY=…
-l10n translate --model anthropic:claude-sonnet-5-5
+localship translate --model anthropic:claude-sonnet-5-5
 ```
 
 | Provider | Model spec | Key |
@@ -118,13 +118,13 @@ back to the model once with its errors; strings that still fail are listed at th
 Set models per locale in the config to route hard languages to a stronger model.
 
 **Review and approve.** Drafts already ship in Android and gettext files (String Catalogs mark
-them `needs_review`). Review them with the `l10n-review` skill or by hand, then
-`l10n approve --locale hi`. To adopt translations made before l10n-agent, run
-`l10n approve --from untracked`. To accept edits made by hand, use `--from edited`.
+them `needs_review`). Review them with the `localship-review` skill or by hand, then
+`localship approve --locale hi`. To adopt translations made before Localship, run
+`localship approve --from untracked`. To accept edits made by hand, use `--from edited`.
 
 ## Context files
 
-Translations are only as good as the context. These live next to your config in `.l10n/`, in git:
+Translations are only as good as the context. These live next to your config in `.localship/`, in git:
 
 | File | What it holds |
 |---|---|
@@ -133,7 +133,7 @@ Translations are only as good as the context. These live next to your config in 
 | `glossary.yaml` | Names to keep as written, and terms with fixed translations |
 
 ```yaml
-# .l10n/glossary.yaml
+# .localship/glossary.yaml
 terms:
   - term: Jotter
     translate: false          # brand: keep as written in every language
@@ -142,7 +142,7 @@ terms:
     translations: { hi: ट्रैश, ar: سلة المهملات }
 ```
 
-The `l10n-setup` skill drafts these from your README and strings. Glossary terms are matched as
+The `localship-setup` skill drafts these from your README and strings. Glossary terms are matched as
 whole words in the source. In translations, fixed terms are matched inside words too, since
 Arabic and Hindi attach particles.
 
@@ -153,9 +153,9 @@ Arabic and Hindi attach particles.
 | `sourceLocale` | `en` | Language the source strings are written in |
 | `locales` | locales found on disk | Languages to work on (BCP 47: `hi`, `pt-BR`, `zh-Hans`) |
 | `targets` | required | List of translation file sets, see below |
-| `lock` | `.l10n/lock.json` | Where translation state is recorded |
-| `context` | `.l10n` | Folder with `brief.md`, `voice/` and `glossary.yaml` |
-| `models` | none | Models for `l10n translate`: `default`, and per locale or language, e.g. `ar: anthropic:claude-opus-5-5` |
+| `lock` | `.localship/lock.json` | Where translation state is recorded |
+| `context` | `.localship` | Folder with `brief.md`, `voice/` and `glossary.yaml` |
+| `models` | none | Models for `localship translate`: `default`, and per locale or language, e.g. `ar: anthropic:claude-opus-5-5` |
 | `providers` | none | Extra OpenAI-compatible providers: `name: { baseUrl, apiKeyEnv }` |
 
 Every target has a `format` and a `path`, plus an optional `id` (needed when two targets share a format).
@@ -182,21 +182,21 @@ Every target has a `format` and a `path`, plus an optional `id` (needed when two
   `.resx`, `.properties`, XLIFF) are listed, so nothing is ignored silently.
 - **Hints:** an Xcode project without a String Catalog gets told how to add one.
 - **In agents and CI:** without a terminal, `init` writes only with `--yes` or `--accept`. An
-  agent can run `l10n detect --json`, show the user the options, then run
-  `l10n init --accept 1 --locales hi,ar`.
+  agent can run `localship detect --json`, show the user the options, then run
+  `localship init --accept 1 --locales hi,ar`.
 
 ## Status states
 
 | State | Meaning |
 |---|---|
 | `missing` | No translation yet |
-| `untracked` | A translation exists that l10n-agent didn't record (written before you adopted it) |
+| `untracked` | A translation exists that Localship didn't record (written before you adopted it) |
 | `stale` | The source text changed after the translation was made |
-| `edited` | The translation was changed outside l10n-agent; it is kept and never overwritten |
+| `edited` | The translation was changed outside Localship; it is kept and never overwritten |
 | `draft` | Not reviewed yet, including gettext `fuzzy` and Xcode `needs_review` |
 | `reviewed`, `approved` | Checked by an AI reviewer or a person |
 
-States come from the files plus `.l10n/lock.json`, which records a hash of each source and
+States come from the files plus `.localship/lock.json`, which records a hash of each source and
 translation.
 
 ## Formats

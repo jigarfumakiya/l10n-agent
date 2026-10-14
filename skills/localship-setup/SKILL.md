@@ -1,19 +1,19 @@
 ---
-name: l10n-setup
-description: Set up localization for an app repo with l10n-agent — whether it already has translations, has string resources but no translations, or has its text hardcoded. Finds the translation files, writes l10n.config.yaml, and drafts the brief, voice and glossary translators need. Use when a project has no l10n.config.yaml yet, or the user asks to add languages or set up translation.
+name: localship-setup
+description: Set up localization for an app repo with Localship — whether it already has translations, has string resources but no translations, or has its text hardcoded. Finds the translation files, writes localship.yaml, and drafts the brief, voice and glossary translators need. Use when a project has no localship.yaml yet, or the user asks to add languages or set up translation.
 ---
 
-# Set up localization with l10n-agent
+# Set up localization with Localship
 
-l10n-agent keeps translations in the repo's own files (Android `res/values-*/strings.xml`,
+Localship keeps translations in the repo's own files (Android `res/values-*/strings.xml`,
 gettext `.po`, Apple `.xcstrings`) and checks every translation in code. You do the parts
 that need judgment: choosing what to set up, and writing the context translators use.
 
 ## Running the tool
 
-- If `l10n_*` MCP tools are available, use them (`l10n_detect`, `l10n_init`, …).
-- Otherwise run the CLI: `l10n <command>`. If `l10n` isn't installed, ask to install it once with
-  `npm install -g github:jigarfumakiya/l10n-agent` (running it through `npx` every time is slow).
+- If `localship_*` MCP tools are available, use them (`localship_detect`, `localship_init`, …).
+- Otherwise run the CLI: `localship <command>`. If `localship` isn't installed, ask to install it once with
+  `npm install -g github:jigarfumakiya/localship` (running it through `npx` every time is slow).
 - Add `--json` when you need to read the output.
 
 Before writing anything, check `git status`. If there are uncommitted changes, mention it, so the
@@ -21,8 +21,8 @@ user can tell your changes apart from theirs.
 
 ## 1. Find out where the project stands
 
-Run `l10n status`. If it works, the project is already set up: go to step 5 (context) if
-`.l10n/brief.md` is missing, or to **Adding languages** below. Otherwise run `l10n detect` and
+Run `localship status`. If it works, the project is already set up: go to step 5 (context) if
+`.localship/brief.md` is missing, or to **Adding languages** below. Otherwise run `localship detect` and
 pick the case that fits:
 
 | What detect shows | Case |
@@ -31,8 +31,8 @@ pick the case that fits:
 | Setups with strings but no languages | **B. Ready to translate** |
 | An empty String Catalog (0 strings) | Ask the user to build the app in Xcode once, then detect again |
 | A gettext template with no translations | **B**, after confirming where new `.po` files go (detect suggests a path) |
-| Nothing, with a hint about Android or Xcode | **C. Text is hardcoded**: run the `l10n-extract` skill first, then come back |
-| Only formats listed as "not supported yet" (Flutter ARB, JSON, `.strings` …) | Say so plainly; l10n-agent can't translate those yet |
+| Nothing, with a hint about Android or Xcode | **C. Text is hardcoded**: run the `localship-extract` skill first, then come back |
+| Only formats listed as "not supported yet" (Flutter ARB, JSON, `.strings` …) | Say so plainly; Localship can't translate those yet |
 
 ## 2. Ask, then init
 
@@ -41,17 +41,17 @@ Show the user what was found and ask:
 - **case A:** whether to keep translating the languages already there, and whether to add more;
 - **case B:** which languages to translate into. Suggest from their market if they don't know.
 
-Then run `l10n init --accept <numbers> --locales <list>` (add `--source <locale>` if the detected
+Then run `localship init --accept <numbers> --locales <list>` (add `--source <locale>` if the detected
 source language is wrong). Language codes are BCP 47 (`hi`, `ar`, `pt-BR`, `zh-Hans`). Never pass
 `--force` unless the user asked to replace their config.
 
 ## 3. Existing translations (case A)
 
-They show as `untracked`: made before l10n-agent, so the tool doesn't know if they're good. Ask:
-- **Trust them:** `l10n approve --from untracked`.
-- **Review first:** run the `l10n-review` skill on them (it can fetch untracked strings).
+They show as `untracked`: made before Localship, so the tool doesn't know if they're good. Ask:
+- **Trust them:** `localship approve --from untracked`.
+- **Review first:** run the `localship-review` skill on them (it can fetch untracked strings).
 - **Leave them:** they stay as they are and are never overwritten without the user's say-so.
-Then `l10n validate`: existing files often have real problems (missing placeholders, broken
+Then `localship validate`: existing files often have real problems (missing placeholders, broken
 plurals). Report the errors and offer to fix them.
 
 ## 4. Platform setup the tool can't do (mention what applies)
@@ -63,7 +63,7 @@ plurals). Report the errors and offer to fix them.
 
 ## 5. Write the context
 
-Create these in `.l10n/` (the `context` folder in the config). Draft them from the README, store
+Create these in `.localship/` (the `context` folder in the config). Draft them from the README, store
 listing, website copy and the strings themselves, then show the user and adjust.
 
 - `brief.md`: what the app does, who uses it, the tone of its copy (calm, playful, formal…), and
@@ -84,18 +84,18 @@ listing, website copy and the strings themselves, then show the user and adjust.
   ```
   Keep it short: names, and terms that appear in many strings or carry product meaning.
 
-Without file access, use `l10n_update_context` instead.
+Without file access, use `localship_update_context` instead.
 
 ## Cleaning up
 
-After strings are deleted or renamed, `l10n prune --dry-run` shows leftover translations; show
-the user, then run `l10n prune`.
+After strings are deleted or renamed, `localship prune --dry-run` shows leftover translations; show
+the user, then run `localship prune`.
 
 ## Adding languages later
 
-`l10n add-locale fr,de` (or `l10n_add_locales`), then translate with `l10n-translate`.
+`localship add-locale fr,de` (or `localship_add_locales`), then translate with `localship-translate`.
 
 ## Finish
 
-Run `l10n validate` and `l10n status`, and tell the user the next step: the `l10n-translate` skill
-(or `l10n translate --model …` for a large catalog). Commit nothing unless the user asks.
+Run `localship validate` and `localship status`, and tell the user the next step: the `localship-translate` skill
+(or `localship translate --model …` for a large catalog). Commit nothing unless the user asks.

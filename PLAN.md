@@ -1,6 +1,6 @@
-# l10n-agent — product and build plan
+# Localship — product and build plan
 
-> Working name. Local-first, agent-native localization for apps.
+> Local-first, agent-native localization for apps.
 > **Your repo is the translation system. Your model is the translator.**
 
 The competitor analysis is in [RESEARCH.md](RESEARCH.md). This plan builds the
@@ -75,9 +75,9 @@ The details are in RESEARCH.md §3.
 ```
                  ┌─────────── surfaces ────────────────────────────────────────┐
  Agent Skills    │ skills/*.md  (Claude Code, Codex, Gemini CLI, Cursor…)      │
- MCP             │ `l10n mcp`: toolsets + prompts + resources                  │
+ MCP             │ `localship mcp`: toolsets + prompts + resources                  │
  CI              │ GitHub Action: validate / translate / open PR               │
- Humans          │ `l10n` CLI · static review page (HTML, no login)            │
+ Humans          │ `localship` CLI · static review page (HTML, no login)          │
                  └──────────────────────────┬──────────────────────────────────┘
                                             ▼
  core (plain TypeScript, file access injected so it's testable and embeddable)
@@ -103,14 +103,14 @@ The details are in RESEARCH.md §3.
 | Mode | Who translates | Use when |
 |---|---|---|
 | Agent | The coding agent's own model (`next_batch` / `submit`) | Small batches, interactive work, models without an API key |
-| Delegated | `l10n translate` calls the configured provider and routes per locale, in parallel | Large catalogs. Keeps the agent's context clean; the agent only handles flagged items |
+| Delegated | `localship translate` calls the configured provider and routes per locale, in parallel | Large catalogs. Keeps the agent's context clean; the agent only handles flagged items |
 | CI | Same as delegated, inside the Action | New strings in every PR |
 
 ## 5. Files in an app repo
 
 ```
-l10n.config.yaml
-.l10n/
+localship.yaml
+.localship/
   brief.md          what the app is, audience, tone. Drafted by the setup skill from README and store listing
   voice/            <locale>.md: formality, tone, things to avoid (e.g. German du vs Sie)
   glossary.yaml     do-not-translate terms + fixed translations per locale, matched case- and Unicode-aware
@@ -121,7 +121,7 @@ l10n.config.yaml
 ```
 
 ```yaml
-# l10n.config.yaml (an Android app)
+# localship.yaml (an Android app)
 sourceLocale: en
 locales: [hi, ar]
 targets:
@@ -137,7 +137,7 @@ review:
   sample: 1.0                 # share of strings reviewed
   autoApproveAbove: null      # off by default; drafts need an explicit approve
 memory:
-  import: [../ios/.l10n/memory.json]   # reuse iOS translations
+  import: [../ios/.localship/memory.json]   # reuse iOS translations
 ```
 
 **Entry states:**
@@ -152,7 +152,7 @@ memory:
 
 ## 6. Features in detail
 
-### 6.1 Setup (`l10n init` + setup skill)
+### 6.1 Setup (`localship init` + setup skill)
 - Detect platforms and resource locations, and write the config.
 - Draft `brief.md`, `voice/*.md` and an initial glossary from the README, store
   listing and repeated product nouns, as Lingo does from links. You review them.
@@ -218,9 +218,9 @@ memory:
   score comes with issues and a suggested fix.
 - `review-queue` sorts by low score, low confidence, high visibility (paywall,
   onboarding) and long text. `approve` / `reject` work per key or in bulk.
-- **Review page:** `l10n report --locale de` writes **one static HTML file**. It shows
+- **Review page:** `localship report --locale de` writes **one static HTML file**. It shows
   source, translation, score, issues and the screenshot crop, with inline edit and
-  approve buttons. It exports a JSON patch that `l10n apply-review` reads back.
+  approve buttons. It exports a JSON patch that `localship apply-review` reads back.
   A translator needs no account and no server.
 - **XLIFF export and import** for professional translators.
 
@@ -263,10 +263,10 @@ memory:
   - `validate`: fails the PR on errors or new hardcoded strings.
   - `translate`: translates new and stale entries, then commits to the PR or opens a
     follow-up PR, copying Lingo's two options.
-- The `l10n-sync` skill handles the same thing locally: "localize what this branch added".
+- The `localship-sync` skill handles the same thing locally: "localize what this branch added".
 
 ### 6.9 MCP surface (small, grouped by role)
-- **Server:** `l10n mcp --toolsets core,dev,translate,review,store` over stdio.
+- **Server:** `localship mcp --toolsets core,dev,translate,review,store` over stdio.
   Remote HTTP comes later.
 
   | Toolset | Tools |
@@ -347,14 +347,14 @@ memory:
     automatically.
   - `approve`: drafts → approved or reviewed. Clears `needs_review`/`fuzzy`, adopts `untracked`
     and accepts `edited` on request.
-  - Skills: `l10n-setup`, `l10n-translate`, `l10n-review`.
+  - Skills: `localship-setup`, `localship-translate`, `localship-review`.
   - Tried for real: an agent translated `examples/android-notes` into hi and ar with 0 errors.
   - Spelling out the only number of a plural form is now info, not a warning.
 - **P6 MCP + delegated done (2026-10-14):**
-  - `l10n mcp` (stdio): 10 tools and the skills as prompts, tested with the MCP SDK client (not yet
+  - `localship mcp` (stdio): 10 tools and the skills as prompts, tested with the MCP SDK client (not yet
     inside Claude Desktop or Cursor). No toolsets or resources yet; the
     tool list is small enough.
-  - `l10n translate`: Anthropic Messages and OpenAI-compatible chat completions (OpenAI,
+  - `localship translate`: Anthropic Messages and OpenAI-compatible chat completions (OpenAI,
     Gemini, OpenRouter, Ollama, LM Studio, custom) through plain `fetch`. Per-locale routing,
     parallel calls with one writer, one retry with the errors attached.
   - Claude Code plugin and marketplace manifests; `npx skills add`; install from GitHub.
@@ -363,13 +363,13 @@ memory:
   - Detects gettext projects that only have a `.pot` template (with the new-file path by
     ecosystem) and flags empty String Catalogs.
   - `add-locale` (CLI and MCP) edits the config, keeping comments.
-  - Skill `l10n-extract`: moving hardcoded Kotlin, XML and Swift text into resources, with
+  - Skill `localship-extract`: moving hardcoded Kotlin, XML and Swift text into resources, with
     pseudolocale checks. Guidance only until P5 adds `scan-code` and `add-source`.
   - The MCP server uses `CLAUDE_PROJECT_DIR`, since Claude Code doesn't promise to start
     servers in the project folder.
   - README rewritten for users; details moved to `docs/reference.md` and `CONTRIBUTING.md`.
 - **Next:**
-  - Publish to npm so `npx l10n-agent` works without building from GitHub.
+  - Publish to npm so `npx localship` works without building from GitHub.
   - P3 formats (JSON, ARB, String Catalog substitutions).
   - P7 AI reviewer and review page; P8 GitHub Action.
 
@@ -382,10 +382,10 @@ any project first. Day counts are rough focused-work estimates.
 | **P0 Foundations** ✅ | Repo, CI, layout, fixtures | CI green | — |
 | **P1 Core + Android** ✅ | model, android-xml read/write, checks, lock reading, `status` / `validate` | 0 false errors on AndroidX resources | — |
 | **P1b Formats** ✅ | Pluggable placeholders and plural models, path patterns; gettext PO, Apple String Catalog | Byte-for-byte round trip on Django and real Xcode catalogs | — |
-| **P2 Detect + init** ✅ | `l10n detect` (candidates with evidence and confidence), `l10n init` (interactive, `--json`, `--yes`) | Finds the right targets in sample Android, iOS, Django and Flutter repos | 2d |
+| **P2 Detect + init** ✅ | `localship detect` (candidates with evidence and confidence), `localship init` (interactive, `--json`, `--yes`) | Finds the right targets in sample Android, iOS, Django and Flutter repos | 2d |
 | **P3 More formats** | JSON (flat, nested, i18next, ICU), Flutter ARB; String Catalog substitutions and device variations | Round trip on real files | 4d |
-| **P4 Agent loop** ✅ | Lockfile writes, brief, voice, glossary, memory; `next-batch`, `submit`, drafts; skills `l10n-setup` + `l10n-translate` | An agent translates a sample app to `hi` and `ar` with 0 errors | 3d |
-| **P5 Extraction** | `scan-code` (Kotlin, Swift), `add-source`, key naming, usage context; skill `l10n-extract`; pseudolocale check | A real app goes from hardcoded text to resources | 5d |
+| **P4 Agent loop** ✅ | Lockfile writes, brief, voice, glossary, memory; `next-batch`, `submit`, drafts; skills `localship-setup` + `localship-translate` | An agent translates a sample app to `hi` and `ar` with 0 errors | 3d |
+| **P5 Extraction** | `scan-code` (Kotlin, Swift), `add-source`, key naming, usage context; skill `localship-extract`; pseudolocale check | A real app goes from hardcoded text to resources | 5d |
 | **P6 MCP + delegated** ✅ | MCP server (toolsets, prompts, resources); providers, routing, `translate` | Works in Claude Desktop and Cursor | 3d |
 | **P7 Quality** | AI reviewer, scores, review queue, static review page, XLIFF | A first locale ships in a real app | 4d |
 | **P8 CI** | GitHub Action (`validate`, `translate`, PR modes) | Pull requests are gated on localization | 2d |
@@ -421,7 +421,9 @@ follow in 0.2 and 0.3 and give more reasons to announce.
 ## 10. Decisions
 
 Decided 2026-10-14:
-1. **Name:** `l10n-agent` for now. Check for collisions before the public release.
+1. **Name:** Localship (renamed from `l10n-agent` on 2026-10-14). Free on npm, `localship.dev`
+   and GitHub; no product with the name found. `localship.com` is taken. A trademark search is
+   still to do before the public release. The `l10n` command and `l10n.config.yaml` still work.
 2. **License:** MIT.
 3. **First test locales:** `hi` (Devanagari, two plural forms, text grows long) and
    `ar` (right to left, all six plural forms). Together they test layout and plurals

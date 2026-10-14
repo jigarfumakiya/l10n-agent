@@ -322,7 +322,7 @@ function hints(files: string[], candidates: Candidate[], unsupported: Unsupporte
   );
   if (xcode && !has("xcstrings") && !appleLegacy) {
     out.push(
-      "This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Text built from variables needs moving to String(localized:) first (the l10n-extract skill helps). Then run detect again.",
+      "This looks like an Xcode project without a String Catalog. Add one in Xcode (File › New › File › String Catalog, named Localizable) and build: Xcode fills it with your SwiftUI Text strings. Text built from variables needs moving to String(localized:) first (the localship-extract skill helps). Then run detect again.",
     );
   }
   const gradle = files.some((f) => /(^|\/)build\.gradle(\.kts)?$/.test(f));
@@ -332,7 +332,7 @@ function hints(files: string[], candidates: Candidate[], unsupported: Unsupporte
     files.some((f) => /\/src\/main\/AndroidManifest\.xml$/.test(f))
   ) {
     out.push(
-      "This looks like an Android project with no strings in res/values yet: the UI text is probably written in the code. Move it into res/values/strings.xml first (the l10n-extract skill does this with your agent), then run detect again.",
+      "This looks like an Android project with no strings in res/values yet: the UI text is probably written in the code. Move it into res/values/strings.xml first (the localship-extract skill does this with your agent), then run detect again.",
     );
   }
   return out;

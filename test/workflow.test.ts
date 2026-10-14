@@ -35,7 +35,7 @@ const IOS = JSON.stringify(
 
 function project(files: Record<string, string> = {}) {
   return memoryFs({
-    "/p/l10n.config.yaml": [
+    "/p/localship.yaml": [
       "locales: [hi, ar]",
       "targets:",
       "  - format: android-xml",
@@ -45,9 +45,9 @@ function project(files: Record<string, string> = {}) {
     ].join("\n"),
     "/p/app/src/main/res/values/strings.xml": STRINGS,
     "/p/ios/Localizable.xcstrings": IOS,
-    "/p/.l10n/brief.md": "StillMoney is a calm budgeting app.",
-    "/p/.l10n/voice/hi.md": "Use तुम, not आप.",
-    "/p/.l10n/glossary.yaml": [
+    "/p/.localship/brief.md": "StillMoney is a calm budgeting app.",
+    "/p/.localship/voice/hi.md": "Use तुम, not आप.",
+    "/p/.localship/glossary.yaml": [
       "terms:",
       "  - term: StillMoney",
       "    translate: false",
@@ -126,7 +126,7 @@ describe("submit", () => {
     expect(written).toContain('<string name="save">सहेजें</string>');
     expect(written).toContain('<item quantity="other">%d दिन बाकी</item>');
 
-    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    const lock = JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}");
     expect(lock.targets.android.hi.save).toMatchObject({ state: "draft", model: "test-model" });
     const status = computeStatus(await open(fs), ["hi"]).find((s) => s.target === "android");
     expect(status?.counts).toMatchObject({ draft: 3, missing: 1 });
@@ -204,7 +204,7 @@ describe("submit", () => {
     });
     expect(r.accepted).toHaveLength(1);
     expect(fs.files.has("/p/app/src/main/res/values-hi/strings.xml")).toBe(false);
-    expect(fs.files.has("/p/.l10n/lock.json")).toBe(false);
+    expect(fs.files.has("/p/.localship/lock.json")).toBe(false);
   });
 
   it("offers translations of the same text from other targets", async () => {
@@ -253,7 +253,7 @@ describe("approve", () => {
       s.entries.filter((e) => e.state !== "missing").map((e) => e.state),
     );
     expect(states).toEqual(["approved", "approved"]);
-    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    const lock = JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}");
     expect(lock.targets.android.hi.save.state).toBe("approved");
   });
 
@@ -315,7 +315,7 @@ describe("glossary", () => {
 describe("gettext removal", () => {
   it("empties msgstr for strings still in the template and deletes ones that left it", async () => {
     const files = memoryFs({
-      "/g/l10n.config.yaml":
+      "/g/localship.yaml":
         "locales: [de]\ntargets:\n  - format: po\n    path: po/{locale}.po\n    template: po/app.pot\n",
       "/g/po/app.pot":
         'msgid ""\nmsgstr "Content-Type: text/plain; charset=UTF-8\\n"\n\nmsgid "Hello"\nmsgstr ""\n',
@@ -344,7 +344,7 @@ describe("gettext removal", () => {
 describe("submit to gettext", () => {
   const fs = () =>
     memoryFs({
-      "/g/l10n.config.yaml":
+      "/g/localship.yaml":
         "locales: [ru]\ntargets:\n  - format: po\n    path: po/{locale}.po\n    template: po/app.pot\n",
       "/g/po/app.pot": [
         'msgid ""',
@@ -387,7 +387,7 @@ describe("stale entries", () => {
   it("show the source text the old translation was made from", async () => {
     const fs = project();
     await submit(await open(fs), [{ locale: "hi", key: "save", value: "सहेजें" }]);
-    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    const lock = JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}");
     expect(lock.targets.android.hi.save.sourceText).toBe("Save");
     const src = "/p/app/src/main/res/values/strings.xml";
     fs.files.set(src, (fs.files.get(src) ?? "").replace(">Save<", ">Save budget<"));
@@ -422,7 +422,7 @@ describe("removeTranslations", () => {
     );
     const catalog = JSON.parse(fs.files.get("/p/ios/Localizable.xcstrings") ?? "{}");
     expect(catalog.strings.Cancel).toEqual({ comment: "Dismisses a sheet" });
-    const lock = JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}");
+    const lock = JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}");
     expect(Object.keys(lock.targets.android.hi)).toEqual(["cancel"]);
     const states = computeStatus(await open(fs), ["hi"])[0]?.entries;
     expect(states?.find((e) => e.key === "save")?.state).toBe("missing");
@@ -459,7 +459,7 @@ describe("prune", () => {
         "</resources>",
         "",
       ].join("\n"),
-      "/p/.l10n/lock.json": JSON.stringify({
+      "/p/.localship/lock.json": JSON.stringify({
         version: 1,
         targets: {
           android: { ar: { old_key: { source: "x", target: "y", state: "draft" } } },
@@ -480,7 +480,7 @@ describe("prune", () => {
     expect(fs.files.get("/p/app/src/main/res/values-ar/strings.xml")).toBe(
       '<resources>\n    <!-- Old screen -->\n    <string name="cancel">إلغاء</string>\n</resources>\n',
     );
-    expect(JSON.parse(fs.files.get("/p/.l10n/lock.json") ?? "{}").targets).toEqual({
+    expect(JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}").targets).toEqual({
       android: { ar: {} },
     });
     expect((await prune(await open(fs))).removed).toEqual([]);

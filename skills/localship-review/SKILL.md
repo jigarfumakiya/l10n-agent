@@ -1,30 +1,30 @@
 ---
-name: l10n-review
-description: Review draft translations made with l10n-agent — check meaning, tone, terminology and fit, fix what's wrong, and approve when the user agrees. Use when the user asks to review, proofread or approve translations.
+name: localship-review
+description: Review draft translations made with Localship — check meaning, tone, terminology and fit, fix what's wrong, and approve when the user agrees. Use when the user asks to review, proofread or approve translations.
 ---
 
-# Review translations with l10n-agent
+# Review translations with Localship
 
 Drafts are translations the tool checked mechanically but no one has reviewed yet. Your job
 is the part code can't check: meaning, tone, terminology, grammar and fit.
 
 ## Running the tool
 
-Use the `l10n_*` MCP tools when available; otherwise the CLI `l10n <command>`. If it isn't
-installed, ask to install it once with `npm install -g github:jigarfumakiya/l10n-agent`.
+Use the `localship_*` MCP tools when available; otherwise the CLI `localship <command>`. If it isn't
+installed, ask to install it once with `npm install -g github:jigarfumakiya/localship`.
 
 ## Steps
 
-1. `l10n status` shows how many `draft`, `edited` (changed by hand) and `untracked`
+1. `localship status` shows how many `draft`, `edited` (changed by hand) and `untracked`
    (made before the tool) strings each locale has.
 
 2. Fetch what to review, a batch at a time:
    ```sh
-   l10n next-batch --locale hi --states draft
+   localship next-batch --locale hi --states draft
    ```
    Each item shows `source` and the translation as `current`, with the comment, plural forms
-   and glossary. Read `.l10n/brief.md` and the locale's voice first.
-   To review translations made before l10n-agent, use `--states untracked`; for hand edits,
+   and glossary. Read `.localship/brief.md` and the locale's voice first.
+   To review translations made before Localship, use `--states untracked`; for hand edits,
    `--states edited`. Fixing those replaces a person's work, so ask before resubmitting, and
    pass `--force` only then.
 
@@ -37,16 +37,16 @@ installed, ask to install it once with `npm install -g github:jigarfumakiya/l10n
    - **Locale conventions:** punctuation, quotes, numbers and dates for that language.
 
 4. Fix problems by resubmitting the corrected text (drafts can be replaced):
-   `l10n submit fixes.json`. Leave correct ones alone. To throw a draft away so it gets
-   translated again from scratch: `l10n remove --locale hi --keys a,b`.
+   `localship submit fixes.json`. Leave correct ones alone. To throw a draft away so it gets
+   translated again from scratch: `localship remove --locale hi --keys a,b`.
 
 5. Report to the user: what you changed and why, and anything you're unsure of (ambiguous
    source, missing context). Group by locale. If you can't judge a language well, say so.
 
 6. **Approve only when the user says so:**
-   - `l10n approve --locale hi` approves every draft in that locale;
+   - `localship approve --locale hi` approves every draft in that locale;
    - `--keys a,b` approves specific strings; `--reviewed` marks them reviewed instead;
    - `--from edited` accepts hand edits; `--from untracked` adopts translations made before
      the tool.
 
-Run `l10n validate` at the end; it must have no errors. Commit nothing unless asked.
+Run `localship validate` at the end; it must have no errors. Commit nothing unless asked.

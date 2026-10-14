@@ -48,7 +48,7 @@ describe("validate on library-style resources", () => {
   it("skips aliases and single identical words", async () => {
     const { memoryFs } = await import("../src/core/fs.js");
     const fs = memoryFs({
-      "/app/l10n.config.yaml": "locales: [de]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/app/localship.yaml": "locales: [de]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/app/res/values/strings.xml":
         '<resources><string name="alias">@string/other</string><string name="minute">Minute</string><string name="two">Pick a date</string></resources>',
       "/app/res/values-de/strings.xml":

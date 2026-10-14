@@ -7,7 +7,7 @@ import { nextBatch } from "../src/core/workflow.js";
 describe("usage context", () => {
   it("shows Android code that uses each string, with the line that gives its role", async () => {
     const fs = memoryFs({
-      "/a/l10n.config.yaml":
+      "/a/localship.yaml":
         "locales: [hi]\ntargets:\n  - format: android-xml\n    path: app/src/main/res\n",
       "/a/app/src/main/res/values/strings.xml":
         '<resources><string name="save">Save</string><string name="cancel">Cancel</string><string name="unused">Unused</string></resources>',
@@ -38,7 +38,7 @@ describe("usage context", () => {
 
   it("matches SwiftUI text, interpolations included, to String Catalog keys", async () => {
     const fs = memoryFs({
-      "/i/l10n.config.yaml":
+      "/i/localship.yaml":
         "locales: [hi]\ntargets:\n  - format: xcstrings\n    path: App/Localizable.xcstrings\n",
       "/i/App/Localizable.xcstrings": JSON.stringify({
         sourceLanguage: "en",
@@ -62,7 +62,7 @@ describe("usage context", () => {
 
   it("reads the code behind gettext references, and keeps references it can't open", async () => {
     const fs = memoryFs({
-      "/g/l10n.config.yaml":
+      "/g/localship.yaml":
         "locales: [de]\ntargets:\n  - format: po\n    path: po/{locale}.po\n    template: po/app.pot\n",
       "/g/po/app.pot":
         '#: app/views.py:2\nmsgid "Hello"\nmsgstr ""\n\n#: gone.py:9\nmsgid "Bye"\nmsgstr ""\n',
@@ -78,7 +78,7 @@ describe("usage context", () => {
 
   it("can be turned off", async () => {
     const fs = memoryFs({
-      "/a/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/a/localship.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
       "/a/res/values/strings.xml": '<resources><string name="save">Save</string></resources>',
       "/a/Main.kt": "Text(stringResource(R.string.save))",
     });

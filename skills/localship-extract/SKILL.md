@@ -1,6 +1,6 @@
 ---
-name: l10n-extract
-description: Make an Android or iOS app localizable by moving text hardcoded in Kotlin, XML layouts or Swift into string resources or a String Catalog, without changing behavior. Use when an app has no translation files yet, when l10n detect finds nothing, or when the user asks to find hardcoded strings.
+name: localship-extract
+description: Make an Android or iOS app localizable by moving text hardcoded in Kotlin, XML layouts or Swift into string resources or a String Catalog, without changing behavior. Use when an app has no translation files yet, when localship detect finds nothing, or when the user asks to find hardcoded strings.
 ---
 
 # Make an app localizable
@@ -85,6 +85,6 @@ not translatable.
 
 ## 5. Then
 
-Run `l10n detect` (or `l10n_detect`): it should now find the strings. Continue with the
-`l10n-setup` skill. Commit nothing unless the user asks; suggest committing the extraction on its
+Run `localship detect` (or `localship_detect`): it should now find the strings. Continue with the
+`localship-setup` skill. Commit nothing unless the user asks; suggest committing the extraction on its
 own before translating, so the diff is easy to review.

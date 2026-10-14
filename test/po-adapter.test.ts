@@ -148,7 +148,7 @@ describe("po adapter", async () => {
 
   it("uses every msgid as the source when there is no template", async () => {
     const fs = memoryFs({
-      "/a/l10n.config.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
+      "/a/localship.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
       "/a/po/de.po": 'msgid "One"\nmsgstr "Eins"\n\nmsgid "Two"\nmsgstr ""\n',
       "/a/po/fr.po": 'msgid "Three"\nmsgstr "Trois"\n',
     });
@@ -181,7 +181,7 @@ describe("po adapter", async () => {
 describe("po newlines", () => {
   it("makes a leading or trailing newline mismatch an error, as msgfmt does", async () => {
     const fs = memoryFs({
-      "/a/l10n.config.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
+      "/a/localship.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
       "/a/po/de.po": [
         'msgid "Usage:\\n"',
         'msgstr "Verwendung:"',

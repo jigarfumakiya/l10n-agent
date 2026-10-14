@@ -1,10 +1,11 @@
 {
-  "name": "l10n-agent",
+  "name": "localship",
   "version": "0.0.0",
   "description": "Local-first, agent-native localization for apps. Your repo is the translation system; your model is the translator.",
   "license": "MIT",
   "type": "module",
   "bin": {
+    "localship": "./dist/cli.js",
     "l10n": "./dist/cli.js"
   },
   "files": [

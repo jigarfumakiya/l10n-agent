@@ -1,7 +1,7 @@
 import { UserError } from "../core/errors.js";
 
 /**
- * Model access for `l10n translate`. Two wire protocols cover nearly every provider:
+ * Model access for `localship translate`. Two wire protocols cover nearly every provider:
  * Anthropic's Messages API and the OpenAI-compatible chat completions API (OpenAI, Gemini,
  * OpenRouter, Ollama, LM Studio, vLLM…). Plain `fetch`, no SDKs.
  */

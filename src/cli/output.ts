@@ -170,7 +170,7 @@ export function describeNone(result: DetectResult): string[] {
   lines.push(
     "",
     dim(
-      "You can also write l10n.config.yaml by hand: https://github.com/jigarfumakiya/l10n-agent/blob/main/docs/reference.md#configuration",
+      "You can also write localship.yaml by hand: https://github.com/jigarfumakiya/localship/blob/main/docs/reference.md#configuration",
     ),
   );
   return lines;

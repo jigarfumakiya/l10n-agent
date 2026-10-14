@@ -1,11 +1,11 @@
 <div align="center">
 
-# 🌍 l10n-agent
+# 🌍 Localship
 
 **Translate your app with the AI you already use.**
 Free, private, and checked so nothing breaks.
 
-[![CI](https://github.com/jigarfumakiya/l10n-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/jigarfumakiya/l10n-agent/actions/workflows/ci.yml)
+[![CI](https://github.com/jigarfumakiya/localship/actions/workflows/ci.yml/badge.svg)](https://github.com/jigarfumakiya/localship/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
@@ -17,7 +17,7 @@ Free, private, and checked so nothing breaks.
 
 ---
 
-Ask your coding agent to localize your app. **l10n-agent** finds your translation files, gives the
+Ask your coding agent to localize your app. **Localship** finds your translation files, gives the
 AI the context it needs, checks every translation before it touches your files, and keeps
 everything in your repo.
 
@@ -63,7 +63,7 @@ all supported. String Catalog substitutions and device variations come next.
 
 ## 🆚 Why it's different
 
-| | Cloud localization platforms | Pasting strings into a chatbot | **l10n-agent** |
+| | Cloud localization platforms | Pasting strings into a chatbot | **Localship** |
 |---|:---:|:---:|:---:|
 | Translations stay in your repo | ❌ Synced to their servers | ✅ | ✅ |
 | Price | 💸 Per seat or per word | Your AI plan | **Free** + your AI plan |
@@ -79,8 +79,8 @@ all supported. String Catalog substitutions and device variations come next.
 **1. Install** in Claude Code:
 
 ```
-/plugin marketplace add jigarfumakiya/l10n-agent
-/plugin install l10n-agent@l10n-agent
+/plugin marketplace add jigarfumakiya/localship
+/plugin install localship@localship
 ```
 
 Using Cursor, Codex, VS Code or another tool? See [Works with your AI tools](#-works-with-your-ai-tools).
@@ -116,24 +116,24 @@ When you're happy, say "approve them" and build your app as usual. 🎉
 
 ## 🤖 Works with your AI tools
 
-l10n-agent is an [MCP server](https://modelcontextprotocol.io) plus agent skills. Add the server
+Localship is an [MCP server](https://modelcontextprotocol.io) plus agent skills. Add the server
 to your tool, then ask in plain words as above.
 
 ```json
 {
   "mcpServers": {
-    "l10n": { "command": "npx", "args": ["-y", "github:jigarfumakiya/l10n-agent", "mcp"] }
+    "localship": { "command": "npx", "args": ["-y", "github:jigarfumakiya/localship", "mcp"] }
   }
 }
 ```
 
 | Tool | Where it goes |
 |---|---|
-| **Claude Code** | The plugin above, or `claude mcp add l10n -- npx -y github:jigarfumakiya/l10n-agent mcp` |
+| **Claude Code** | The plugin above, or `claude mcp add localship -- npx -y github:jigarfumakiya/localship mcp` |
 | **Cursor** | `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` |
 | **VS Code** | `.vscode/mcp.json`, with `"servers"` instead of `"mcpServers"` and `"type": "stdio"` added |
 | **Gemini CLI** | `.gemini/settings.json` |
-| **Codex** | `~/.codex/config.toml`: `[mcp_servers.l10n]` with `command = "npx"` and `args = ["-y", "github:jigarfumakiya/l10n-agent", "mcp"]` |
+| **Codex** | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "github:jigarfumakiya/localship", "mcp"]` |
 | **Claude Desktop** | The JSON above, with `"-C", "/path/to/your/app"` before `"mcp"` |
 
 ⏱️ The first start takes a minute while it installs; after that it's quick.
@@ -142,7 +142,7 @@ For agents that read skills (Claude Code, Codex, Cursor, Gemini CLI…), add the
 playbooks for setting up, making an app localizable, translating and reviewing:
 
 ```sh
-npx skills add jigarfumakiya/l10n-agent
+npx skills add jigarfumakiya/localship
 ```
 
 ## ⌨️ Without an agent
@@ -150,12 +150,12 @@ npx skills add jigarfumakiya/l10n-agent
 Everything also works from the terminal, which is handy for big apps and CI:
 
 ```sh
-npm install -g github:jigarfumakiya/l10n-agent
+npm install -g github:jigarfumakiya/localship
 
-l10n init                                            # find your files, pick languages
-l10n translate --model anthropic:claude-sonnet-5-5   # or openai:…, gemini:…, ollama:…
-l10n validate                                        # exits 1 on errors: use it in CI
-l10n approve
+localship init                                            # find your files, pick languages
+localship translate --model anthropic:claude-sonnet-5-5   # or openai:…, gemini:…, ollama:…
+localship validate                                        # exits 1 on errors: use it in CI
+localship approve
 ```
 
 ## 🔍 How it works
@@ -180,7 +180,7 @@ edited by hand.
 <details>
 <summary><b>Where do my strings go?</b></summary>
 
-Only to the AI you choose. There's no l10n-agent server.
+Only to the AI you choose. There's no Localship server.
 </details>
 
 <details>
@@ -216,7 +216,7 @@ formats, on macOS, Linux and Windows. See the [plan](PLAN.md) for what's next.
 - [x] Android, String Catalog and gettext formats
 - [x] Setup, translation with context, checks, review, approval and cleanup
 - [x] MCP server, agent skills, Claude Code plugin
-- [ ] npm package (`npx l10n-agent`)
+- [ ] npm package (`npx localship`)
 - [ ] Tools to find hardcoded text in Kotlin and Swift
 - [ ] Flutter ARB, JSON and Apple `.strings` formats
 - [ ] GitHub Action for pull requests

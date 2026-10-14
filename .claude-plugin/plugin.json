@@ -1,19 +1,19 @@
 {
-  "name": "l10n-agent",
-  "displayName": "l10n-agent",
+  "name": "localship",
+  "displayName": "Localship",
   "description": "Translate Android, gettext and Apple String Catalog apps with your own model: skills to set up, translate and review, and an MCP server that checks every translation.",
   "author": {
     "name": "Jigar Fumakiya",
     "url": "https://github.com/jigarfumakiya"
   },
-  "homepage": "https://github.com/jigarfumakiya/l10n-agent",
-  "repository": "https://github.com/jigarfumakiya/l10n-agent",
+  "homepage": "https://github.com/jigarfumakiya/localship",
+  "repository": "https://github.com/jigarfumakiya/localship",
   "license": "MIT",
   "keywords": ["localization", "l10n", "i18n", "android", "ios", "xcstrings", "gettext"],
   "mcpServers": {
-    "l10n": {
+    "localship": {
       "command": "npx",
-      "args": ["-y", "github:jigarfumakiya/l10n-agent", "mcp"]
+      "args": ["-y", "github:jigarfumakiya/localship", "mcp"]
     }
   }
 }

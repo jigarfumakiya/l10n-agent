@@ -1,9 +1,9 @@
 ---
-name: l10n-translate
-description: Translate an app's missing or changed strings with l10n-agent — fetch batches with context, translate them, submit them for checks, and fix what's rejected until nothing is left. Use when the user asks to translate, localize, add a language, or update translations after copy changes.
+name: localship-translate
+description: Translate an app's missing or changed strings with Localship — fetch batches with context, translate them, submit them for checks, and fix what's rejected until nothing is left. Use when the user asks to translate, localize, add a language, or update translations after copy changes.
 ---
 
-# Translate with l10n-agent
+# Translate with Localship
 
 The tool picks the strings, gives you the context, checks every translation in code
 (placeholders, plural forms, escaping, markup, glossary) and writes the good ones as drafts.
@@ -11,32 +11,32 @@ You translate. Don't edit translation files by hand.
 
 ## Running the tool
 
-- If `l10n_*` MCP tools are available, use them: `l10n_next_batch`, `l10n_submit`, …
-- Otherwise run the CLI: `l10n <command>`. If it isn't installed, ask to install it once with
-  `npm install -g github:jigarfumakiya/l10n-agent`.
-- No `l10n.config.yaml`? Run the `l10n-setup` skill first.
-- A language that isn't configured yet: `l10n add-locale <code>` first.
+- If `localship_*` MCP tools are available, use them: `localship_next_batch`, `localship_submit`, …
+- Otherwise run the CLI: `localship <command>`. If it isn't installed, ask to install it once with
+  `npm install -g github:jigarfumakiya/localship`.
+- No `localship.yaml`? Run the `localship-setup` skill first.
+- A language that isn't configured yet: `localship add-locale <code>` first.
 - Check `git status` first and mention uncommitted changes, so the translation diff stays reviewable.
 
 ## 1. Size up the work
 
-Run `l10n status`. Count `missing` + `stale` across the locales to translate.
+Run `localship status`. Count `missing` + `stale` across the locales to translate.
 
 - **Up to a few hundred strings:** translate them yourself (step 2).
 - **More than that**, or the user wants it done without you: delegate to a model API with
-  `l10n translate --model <provider:model>` (or `models:` in the config). Providers:
+  `localship translate --model <provider:model>` (or `models:` in the config). Providers:
   `anthropic`, `openai`, `gemini`, `openrouter` (keys from `ANTHROPIC_API_KEY`,
   `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`), and local `ollama`, `lmstudio`.
   It runs the same checks and retries rejected strings. Then review what it reports as failed
   and translate those yourself.
 
-Read `.l10n/brief.md`, `.l10n/voice/` and `.l10n/glossary.yaml` once if they exist. If
-there's no brief, write a short one first (see `l10n-setup`): translations without context
+Read `.localship/brief.md`, `.localship/voice/` and `.localship/glossary.yaml` once if they exist. If
+there's no brief, write a short one first (see `localship-setup`): translations without context
 come out generic.
 
 ## 2. The loop
 
-1. `l10n next-batch --locale <locale>` (one locale at a time works best). Each item has:
+1. `localship next-batch --locale <locale>` (one locale at a time works best). Each item has:
    - `source` — the text, or plural forms, or array items, in the file's own syntax;
    - `comment`, `context`, and `usage` — the code that shows the string: the file path names the
      screen, the code shows whether it's a button, title, label or message;
@@ -63,7 +63,7 @@ come out generic.
 
 3. Submit, using a file for anything non-trivial:
    ```sh
-   l10n submit translations.json --model <your model name>
+   localship submit translations.json --model <your model name>
    ```
    ```json
    {"translations": [
@@ -81,11 +81,11 @@ come out generic.
 
 ## 3. Finish
 
-- Run `l10n validate`. It must have no errors.
-- Run `l10n status` and report per locale: how many drafts were written, anything that
+- Run `localship validate`. It must have no errors.
+- Run `localship status` and report per locale: how many drafts were written, anything that
   failed, warnings you left and why, and terms you were unsure of.
-- **Don't approve your own drafts.** Suggest the user reviews them (the `l10n-review` skill),
-  then `l10n approve`.
+- **Don't approve your own drafts.** Suggest the user reviews them (the `localship-review` skill),
+  then `localship approve`.
 - Never pass `--force` unless the user explicitly asks: it replaces translations a person
   wrote, reviewed or approved.
 

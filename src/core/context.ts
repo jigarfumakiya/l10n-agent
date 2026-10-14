@@ -6,7 +6,7 @@ import type { FileSystem } from "./fs.js";
 
 /**
  * What translators need beyond the strings: the product brief, voice per locale and the
- * glossary. All plain files in the context folder (`.l10n/` by default), kept in git.
+ * glossary. All plain files in the context folder (`.localship/` by default), kept in git.
  */
 export interface ProjectContext {
   dir: string;
