@@ -1,6 +1,7 @@
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
+import { UserError } from "./errors.js";
 import type { FileSystem } from "./fs.js";
 import { PLACEHOLDER_SYNTAXES } from "./placeholders.js";
 
@@ -20,13 +21,13 @@ const id = z
   .regex(/^[A-Za-z0-9_-]+$/, "Use letters, digits, - and _")
   .optional();
 
-const AndroidTargetSchema = z.object({
+const AndroidTargetSchema = z.strictObject({
   id,
   format: z.literal("android-xml"),
   path: z.string(),
 });
 
-const PoTargetSchema = z.object({
+const PoTargetSchema = z.strictObject({
   id,
   format: z.literal("po"),
   path: z
@@ -37,7 +38,7 @@ const PoTargetSchema = z.object({
   pluralForms: z.record(z.string(), z.string()).optional(),
 });
 
-const XcstringsTargetSchema = z.object({
+const XcstringsTargetSchema = z.strictObject({
   id,
   format: z.literal("xcstrings"),
   path: z
@@ -49,7 +50,7 @@ const XcstringsTargetSchema = z.object({
 });
 
 export const ConfigSchema = z
-  .object({
+  .strictObject({
     sourceLocale: locale.default("en"),
     locales: z.array(locale).default([]),
     targets: z
@@ -92,7 +93,51 @@ export function targetId(
 export type Config = z.infer<typeof ConfigSchema>;
 export type TargetConfig = Config["targets"][number];
 
-export class ConfigError extends Error {}
+const KNOWN_KEYS = [
+  "sourceLocale",
+  "locales",
+  "targets",
+  "lock",
+  "id",
+  "format",
+  "path",
+  "template",
+  "placeholders",
+  "pluralForms",
+];
+
+/** The known key within a couple of edits of `key`, if any. */
+function closest(key: string, known: string[]): string | undefined {
+  let best: string | undefined;
+  let bestDistance = Math.max(2, Math.floor(key.length / 3)) + 1;
+  for (const k of known) {
+    const d = editDistance(key.toLowerCase(), k.toLowerCase());
+    if (d < bestDistance) {
+      best = k;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
+function editDistance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      cur[j] = Math.min(
+        (prev[j] as number) + 1,
+        (cur[j - 1] as number) + 1,
+        (prev[j - 1] as number) + cost,
+      );
+    }
+    prev = cur;
+  }
+  return prev[b.length] as number;
+}
+
+export class ConfigError extends UserError {}
 
 export interface LoadedConfig {
   config: Config;
@@ -134,9 +179,16 @@ export async function loadConfig(
   }
   const parsed = ConfigSchema.safeParse(raw ?? {});
   if (!parsed.success) {
-    const details = parsed.error.issues.map(
-      (i) => `  ${i.path.join(".") || "(root)"}: ${i.message}`,
-    );
+    const details = parsed.error.issues.flatMap((i) => {
+      const at = i.path.join(".") || "(root)";
+      if (i.code === "unrecognized_keys") {
+        return i.keys.map((k) => {
+          const guess = closest(k, KNOWN_KEYS);
+          return `  ${at}: unknown key "${k}"${guess ? ` (did you mean "${guess}"?)` : ""}`;
+        });
+      }
+      return [`  ${at}: ${i.message}`];
+    });
     throw new ConfigError(`${file} is invalid:\n${details.join("\n")}`);
   }
   return { config: parsed.data, root: path.dirname(file), file };

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { type FileSystem, memoryFs, nodeFs } from "../src/core/fs.js";
 import { openProject } from "../src/core/project.js";
-import { androidAdapter } from "../src/formats/android/adapter.js";
+import { androidAdapter, serializeResources } from "../src/formats/android/adapter.js";
 import { fixture } from "./helpers.js";
 
 describe("android adapter", () => {
@@ -34,7 +34,7 @@ describe("android adapter", () => {
     expect(t?.issues).toEqual([]);
   });
 
-  it("writes a locale file back byte for byte", async () => {
+  it("leaves an unchanged locale file alone, and generates the same bytes from scratch", async () => {
     const root = fixture("android/roundtrip");
     const p = await openProject(nodeFs, { cwd: root });
     const target = p.targets[0]?.target;
@@ -50,8 +50,42 @@ describe("android adapter", () => {
     );
     const result = await reopened.writeLocale(catalog);
     const file = path.join(root, "res", "values-ar", "strings.xml");
-    expect(result.files).toEqual([path.join("res", "values-ar", "strings.xml")]);
-    expect(out.files.get(file)).toBe(await fsp.readFile(file, "utf8"));
+    expect(result.files).toEqual([]);
+    expect(out.files.size).toBe(0);
+    // A brand-new file in Android Studio's layout comes out identical to the fixture.
+    const generated = serializeResources(
+      [...catalog.entries.values()],
+      [["xmlns:xliff", "urn:oasis:names:tc:xliff:document:1.2"]],
+    );
+    expect(generated).toBe(await fsp.readFile(file, "utf8"));
+  });
+
+  it("splices changes into an existing file, keeping comments and layout", async () => {
+    const fs = memoryFs({
+      "/app/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/app/res/values/strings.xml":
+        '<resources>\n  <string name="a">A</string>\n  <string name="b">B</string>\n  <plurals name="d"><item quantity="one">%d day</item><item quantity="other">%d days</item></plurals>\n  <string name="c">C</string>\n</resources>\n',
+      "/app/res/values-hi/strings.xml":
+        '<?xml version="1.0" encoding="utf-8"?>\n<!-- Reviewed by the Hindi team -->\n<resources>\n\n  <!-- Home -->\n  <string name="a">ए</string>\n\n  <string msgid="123" name="c">सी</string> <!-- keep -->\n</resources>\n',
+    });
+    const t = (await openProject(fs, { cwd: "/app" })).targets[0]?.target;
+    if (!t) throw new Error("no target");
+    const src = (k: string) =>
+      t.source.entries.get(k) as NonNullable<ReturnType<typeof t.source.entries.get>>;
+    await t.writeLocale({
+      locale: "hi",
+      entries: new Map([
+        ["c", { ...src("c"), message: { kind: "text", value: "सी२" } }],
+        ["b", { ...src("b"), message: { kind: "text", value: "बी" } }],
+        [
+          "d",
+          { ...src("d"), message: { kind: "plural", forms: { one: "%d दिन", other: "%d दिन" } } },
+        ],
+      ]),
+    });
+    expect(fs.files.get("/app/res/values-hi/strings.xml")).toBe(
+      '<?xml version="1.0" encoding="utf-8"?>\n<!-- Reviewed by the Hindi team -->\n<resources>\n\n  <!-- Home -->\n  <string name="a">ए</string>\n  <string name="b">बी</string>\n  <plurals name="d">\n    <item quantity="one">%d दिन</item>\n    <item quantity="other">%d दिन</item>\n  </plurals>\n\n  <string name="c" msgid="123">सी२</string> <!-- keep -->\n</resources>\n',
+    );
   });
 
   it("adds new keys in source order and keeps keys it was not given", async () => {
@@ -73,7 +107,7 @@ describe("android adapter", () => {
       entries: new Map([["a", { ...a, message: { kind: "text", value: "ए" } }]]),
     });
     expect(fs.files.get("/app/res/values-hi/strings.xml")).toBe(
-      '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="a">ए</string>\n    <string name="c">सी</string>\n</resources>\n',
+      '<resources>\n  <string name="a">ए</string>\n  <string name="c">सी</string>\n</resources>\n',
     );
   });
 
@@ -97,3 +131,24 @@ describe("android adapter", () => {
 function readThrough(mem: FileSystem): FileSystem {
   return { ...nodeFs, writeFile: (f, c) => mem.writeFile(f, c) };
 }
+
+describe("android performance", () => {
+  it("reads and checks 20,000 strings quickly", async () => {
+    const { validateProject } = await import("../src/core/validate.js");
+    const n = 20_000;
+    const body = (f: (i: number) => string) =>
+      `<resources>\n${Array.from({ length: n }, (_, i) => `    <string name="k${i}">${f(i)}</string>`).join("\n")}\n</resources>\n`;
+    const fs = memoryFs({
+      "/big/l10n.config.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/big/res/values/strings.xml": body((i) => `Value ${i} with %1$s`),
+      "/big/res/values-hi/strings.xml": body((i) => `मान ${i} %1$s`),
+    });
+    const started = performance.now();
+    const p = await openProject(fs, { cwd: "/big" });
+    const issues = validateProject(p);
+    expect(issues.filter((i) => i.severity !== "info")).toEqual([]);
+    expect(p.targets[0]?.target.source.entries.get(`k${n - 1}`)?.line).toBe(n + 1);
+    // Was 39 s before line lookups were indexed.
+    expect(performance.now() - started).toBeLessThan(5000);
+  });
+});

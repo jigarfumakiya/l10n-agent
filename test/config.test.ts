@@ -29,3 +29,21 @@ describe("config", () => {
     );
   });
 });
+
+describe("config typos", () => {
+  it("rejects unknown keys and suggests the right one", async () => {
+    const fs = memoryFs({
+      "/app/l10n.config.yaml":
+        "local: [hi]\ntargets:\n  - format: po\n    path: po/{locale}.po\n    templat: x.pot\n    colour: red\n",
+    });
+    const err = await loadConfig(fs, "/app").catch((e: Error) => e);
+    expect(err).toBeInstanceOf(ConfigError);
+    expect(String((err as Error).message)).toMatch(
+      /unknown key "local" \(did you mean "locales"\?\)/,
+    );
+    expect(String((err as Error).message)).toMatch(
+      /unknown key "templat" \(did you mean "template"\?\)/,
+    );
+    expect(String((err as Error).message)).toMatch(/unknown key "colour"\n|unknown key "colour"$/);
+  });
+});

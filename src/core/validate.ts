@@ -192,6 +192,7 @@ function checkTranslation(
       countImplied,
       sameLanguage,
       allowed,
+      strictNewlines: target.strictNewlines,
     }).map((f) => (form ? { ...f, form } : f));
 
   if (s.kind === "text" && t.kind === "text") return compare(s.value, t.value);
@@ -287,7 +288,12 @@ function checkTranslation(
 export function compareValues(
   s: ValueAnalysis,
   t: ValueAnalysis,
-  opts: { countImplied?: boolean; sameLanguage?: boolean; allowed?: Set<string> } = {},
+  opts: {
+    countImplied?: boolean;
+    sameLanguage?: boolean;
+    allowed?: Set<string>;
+    strictNewlines?: boolean;
+  } = {},
 ): Found[] {
   const out: Found[] = [...t.lints];
 
@@ -361,7 +367,18 @@ export function compareValues(
   const edge = (x: string) => [/^\s*/.exec(x)?.[0] ?? "", /\s*$/.exec(x)?.[0] ?? ""];
   const [sl, st] = edge(s.text);
   const [tl, tt] = edge(t.text);
-  if (s.text.trim() !== "" && (sl !== tl || st !== tt)) {
+  const newlineMismatch =
+    opts.strictNewlines &&
+    t.text !== "" &&
+    (s.text.startsWith("\n") !== t.text.startsWith("\n") ||
+      s.text.endsWith("\n") !== t.text.endsWith("\n"));
+  if (newlineMismatch) {
+    out.push({
+      severity: "error",
+      code: "newline-mismatch",
+      message: `The source ${describeNewlines(s.text)}; the translation must too (msgfmt rejects it otherwise)`,
+    });
+  } else if (s.text.trim() !== "" && (sl !== tl || st !== tt)) {
     out.push({
       severity: "warning",
       code: "whitespace",
@@ -369,4 +386,13 @@ export function compareValues(
     });
   }
   return out;
+}
+
+function describeNewlines(text: string): string {
+  const start = text.startsWith("\n");
+  const end = text.endsWith("\n");
+  if (start && end) return "starts and ends with a newline";
+  if (start) return "starts with a newline and doesn't end with one";
+  if (end) return "ends with a newline and doesn't start with one";
+  return "has no newline at either end";
 }

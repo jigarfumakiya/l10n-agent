@@ -1,3 +1,4 @@
+import { UserError } from "./errors.js";
 import type { FileSystem } from "./fs.js";
 
 /** How far a translation has come. `stale`, `edited`, `missing` and `untracked` are derived, never stored. */
@@ -27,8 +28,17 @@ export function emptyLock(): Lockfile {
 
 export async function readLock(fs: FileSystem, file: string): Promise<Lockfile> {
   if (!(await fs.exists(file))) return emptyLock();
-  const data = JSON.parse(await fs.readFile(file)) as Lockfile;
-  if (data.version !== 1) throw new Error(`${file}: unsupported lockfile version ${data.version}`);
+  let data: Lockfile;
+  try {
+    data = JSON.parse(await fs.readFile(file)) as Lockfile;
+  } catch (e) {
+    throw new UserError(
+      `${file} is not valid JSON (${(e as Error).message}). It records translation state; restore it from git, or delete it to start over.`,
+    );
+  }
+  if (data?.version !== 1) {
+    throw new UserError(`${file}: unsupported lockfile version ${String(data?.version)}`);
+  }
   data.targets ??= {};
   return data;
 }

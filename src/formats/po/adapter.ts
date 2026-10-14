@@ -304,6 +304,7 @@ export const poAdapter: FormatAdapter<PoTarget> = {
       source,
       locales,
       issues,
+      strictNewlines: true,
       analyze(value, entry) {
         const syntax = syntaxForFlags(entry.flags, config.placeholders ?? "none");
         return { text: value, placeholders: findPlaceholders(value, syntax), tags: [], lints: [] };

@@ -178,3 +178,34 @@ describe("po adapter", async () => {
     }
   });
 });
+
+describe("po newlines", () => {
+  it("makes a leading or trailing newline mismatch an error, as msgfmt does", async () => {
+    const fs = memoryFs({
+      "/a/l10n.config.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
+      "/a/po/de.po": [
+        'msgid "Usage:\\n"',
+        'msgstr "Verwendung:"',
+        "",
+        'msgid "\\nDone"',
+        'msgstr "\\nFertig"',
+        "",
+        'msgid "Hello "',
+        'msgstr "Hallo"',
+        "",
+      ].join("\n"),
+    });
+    const issues = validateProject(await openProject(fs, { cwd: "/a" }));
+    expect(
+      issues.filter((i) => i.severity !== "info").map((i) => `${i.severity} ${i.key} ${i.code}`),
+    ).toEqual(["error Usage:\n newline-mismatch", "warning Hello  whitespace"]);
+    if (hasMsgfmt) {
+      const run = () =>
+        execFileSync("msgfmt", ["-c", "-o", "/dev/null", "-"], {
+          input: fs.files.get("/a/po/de.po"),
+          stdio: "pipe",
+        });
+      expect(run).toThrow(/fatal error/);
+    }
+  });
+});

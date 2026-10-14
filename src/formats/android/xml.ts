@@ -35,6 +35,8 @@ export type XmlNode = XmlElement | XmlText | XmlComment | XmlCData;
 
 export interface XmlDocument {
   source: string;
+  /** 1-based line of an offset in `source`. */
+  lineOf: (offset: number) => number;
   children: XmlNode[];
   root: XmlElement | undefined;
 }
@@ -53,6 +55,22 @@ export function lineAt(src: string, offset: number): number {
   let line = 1;
   for (let i = 0; i < offset && i < src.length; i++) if (src.charCodeAt(i) === 10) line++;
   return line;
+}
+
+/** Line lookups for a whole file: index built once, then a binary search per lookup. */
+export function lineIndex(src: string): (offset: number) => number {
+  const starts = [0];
+  for (let i = 0; i < src.length; i++) if (src.charCodeAt(i) === 10) starts.push(i + 1);
+  return (offset) => {
+    let lo = 0;
+    let hi = starts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if ((starts[mid] as number) <= offset) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo + 1;
+  };
 }
 
 const NAME = /[A-Za-z_][\w:.-]*/y;
@@ -165,7 +183,7 @@ export function parseXml(src: string): XmlDocument {
   if (open) fail(`Unclosed <${open.name}>`, open.start);
   const roots = top.filter((n): n is XmlElement => n.type === "element");
   if (roots.length > 1) fail("More than one root element", (roots[1] as XmlElement).start);
-  return { source: src, children: top, root: roots[0] };
+  return { source: src, lineOf: lineIndex(src), children: top, root: roots[0] };
 }
 
 export function decodeEntities(s: string): string {

@@ -28,6 +28,11 @@ export interface Target {
    * so the source needn't. Xcode generates source keys from code, where they can't be numbered.
    */
   readonly translationsMayReorder?: boolean;
+  /**
+   * A leading or trailing newline must match the source exactly (gettext: `msgfmt --check`
+   * rejects the file otherwise). Elsewhere it is only a whitespace warning.
+   */
+  readonly strictNewlines?: boolean;
   /** Resolves a raw value so generic checks can compare source and translation. */
   analyze(value: string, entry: Entry): ValueAnalysis;
   /** Plural forms this locale needs in this format; undefined when it can't be known. */

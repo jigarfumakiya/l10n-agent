@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { Command, InvalidArgumentError } from "commander";
-import { ConfigError } from "../core/config.js";
+import { UserError } from "../core/errors.js";
 import { nodeFs } from "../core/fs.js";
 import { openProject } from "../core/project.js";
 import { computeStatus } from "../core/status.js";
@@ -127,7 +127,7 @@ program
   );
 
 program.parseAsync().catch((e: unknown) => {
-  if (e instanceof ConfigError) {
+  if (e instanceof UserError) {
     console.error(e.message);
     process.exitCode = 2;
     return;

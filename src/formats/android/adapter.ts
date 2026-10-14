@@ -15,7 +15,6 @@ import {
   childElements,
   escapeAttr,
   innerRaw,
-  lineAt,
   parseXml,
   type XmlDocument,
   type XmlElement,
@@ -41,8 +40,10 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
     const source: Catalog = { locale: sourceLocale, entries: new Map() };
     const locales = new Map<string, Catalog>();
     const issues: Issue[] = [];
-    /** Root element attributes per file, so rewritten files keep their namespaces. */
+    /** Root element attributes per file, so new files keep their namespaces. */
     const rootAttrs = new Map<string, Array<[string, string]>>();
+    /** Existing translation files, kept as text so updates are spliced in and comments survive. */
+    const localeFiles = new Map<string, LocaleFile>();
 
     const target: Target = {
       id,
@@ -101,9 +102,16 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
         const resources = doc.root;
         if (resources?.name !== "resources") continue;
         const before = catalog.entries.size;
-        readEntries(doc, resources, rel, catalog, (issue) =>
-          issues.push({ ...issue, target: id, locale: locale ?? sourceLocale }),
+        const spans = new Map<string, Span>();
+        readEntries(
+          doc,
+          resources,
+          rel,
+          catalog,
+          (issue) => issues.push({ ...issue, target: id, locale: locale ?? sourceLocale }),
+          spans,
         );
+        if (locale !== null && spans.size > 0) localeFiles.set(abs, { doc, resources, spans });
         if (catalog.entries.size > before || locale === null) {
           rootAttrs.set(
             abs,
@@ -138,9 +146,17 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
 
       const written: string[] = [];
       for (const [abs, entries] of byFile) {
-        const sourceFile = path.join(resDir, "values", path.basename(abs));
-        const attrs = [...(rootAttrs.get(abs) ?? rootAttrs.get(sourceFile) ?? [])];
-        await fs.writeFile(abs, serializeResources(entries, attrs));
+        const known = localeFiles.get(abs);
+        let text: string;
+        if (known) {
+          text = spliceEntries(known, entries, existing, [...source.entries.keys()]);
+          if (text === known.doc.source) continue;
+        } else {
+          const sourceFile = path.join(resDir, "values", path.basename(abs));
+          const attrs = [...(rootAttrs.get(abs) ?? rootAttrs.get(sourceFile) ?? [])];
+          text = serializeResources(entries, attrs);
+        }
+        await fs.writeFile(abs, text);
         written.push(path.relative(root, abs));
       }
       return { files: written };
@@ -156,6 +172,7 @@ function readEntries(
   file: string,
   catalog: Catalog,
   report: (issue: Issue) => void,
+  spans?: Map<string, Span>,
 ) {
   let pendingComment: string | undefined;
   for (const node of resources.children) {
@@ -175,7 +192,7 @@ function readEntries(
     const message = readMessage(doc, node);
     if (!message) continue;
     const name = node.attrs.name;
-    const line = lineAt(doc.source, node.start);
+    const line = doc.lineOf(node.start);
     if (!name) {
       report({
         severity: "error",
@@ -214,6 +231,11 @@ function readEntries(
     if (comment) entry.comment = comment;
     if (Object.keys(attrs).length > 0) entry.attrs = attrs;
     catalog.entries.set(key, entry);
+    spans?.set(key, {
+      start: node.start,
+      end: node.end,
+      attrs: node.attrOrder.filter((a) => a !== "name").map((a) => [a, node.attrs[a] ?? ""]),
+    });
   }
 }
 
@@ -247,38 +269,127 @@ const INDENT = "    ";
 /** Writes a resources file in Android Studio's layout: 4-space indent, CLDR plural order. */
 export function serializeResources(entries: Entry[], rootAttrs: Array<[string, string]>): string {
   const attrs = [...rootAttrs];
-  const usesXliff = entries.some((e) => JSON.stringify(e.message).includes("<xliff:"));
-  if (usesXliff && !attrs.some(([n]) => n === "xmlns:xliff")) attrs.push(["xmlns:xliff", XLIFF_NS]);
+  if (usesXliff(entries) && !attrs.some(([n]) => n === "xmlns:xliff")) {
+    attrs.push(["xmlns:xliff", XLIFF_NS]);
+  }
   const rootOpen = attrs.length
     ? `<resources ${attrs.map(([n, v]) => `${n}="${escapeAttr(v)}"`).join(" ")}>`
     : "<resources>";
-
   const lines = ['<?xml version="1.0" encoding="utf-8"?>', rootOpen];
-  for (const e of entries) {
-    const name = e.key.replace(/\[.*\]$/, "");
-    const extra = Object.entries(e.attrs ?? {})
-      .map(([n, v]) => ` ${n}="${escapeAttr(v)}"`)
-      .join("");
-    const open = (tag: string) => `<${tag} name="${escapeAttr(name)}"${extra}>`;
-    switch (e.message.kind) {
-      case "text":
-        lines.push(`${INDENT}${open("string")}${e.message.value}</string>`);
-        break;
-      case "plural":
-        lines.push(`${INDENT}${open("plurals")}`);
-        for (const c of PLURAL_CATEGORIES) {
-          const v = e.message.forms[c];
-          if (v !== undefined) lines.push(`${INDENT}${INDENT}<item quantity="${c}">${v}</item>`);
-        }
-        lines.push(`${INDENT}</plurals>`);
-        break;
-      case "array":
-        lines.push(`${INDENT}${open("string-array")}`);
-        for (const v of e.message.items) lines.push(`${INDENT}${INDENT}<item>${v}</item>`);
-        lines.push(`${INDENT}</string-array>`);
-        break;
-    }
-  }
+  for (const e of entries) lines.push(INDENT + renderEntry(e, INDENT, "\n"));
   lines.push("</resources>", "");
   return lines.join("\n");
+}
+
+/** One element. Continuation lines get `indent`; items inside get one more `step`. */
+function renderEntry(e: Entry, indent: string, eol: string, step = INDENT): string {
+  const name = e.key.replace(/\[.*\]$/, "");
+  const extra = Object.entries(e.attrs ?? {})
+    .map(([n, v]) => ` ${n}="${escapeAttr(v)}"`)
+    .join("");
+  const open = (tag: string) => `<${tag} name="${escapeAttr(name)}"${extra}>`;
+  const inner = indent + step;
+  switch (e.message.kind) {
+    case "text":
+      return `${open("string")}${e.message.value}</string>`;
+    case "plural": {
+      const forms = e.message.forms;
+      const items = PLURAL_CATEGORIES.flatMap((c) =>
+        forms[c] === undefined ? [] : [`${inner}<item quantity="${c}">${forms[c]}</item>`],
+      );
+      return [open("plurals"), ...items, `${indent}</plurals>`].join(eol);
+    }
+    case "array": {
+      const items = e.message.items.map((v) => `${inner}<item>${v}</item>`);
+      return [open("string-array"), ...items, `${indent}</string-array>`].join(eol);
+    }
+  }
+}
+
+function usesXliff(entries: Entry[]): boolean {
+  return entries.some((e) => JSON.stringify(e.message).includes("<xliff:"));
+}
+
+interface Span {
+  start: number;
+  end: number;
+  /** Every attribute but `name`, in file order, so replaced elements keep the ones we don't model. */
+  attrs: Array<[string, string]>;
+}
+
+interface LocaleFile {
+  doc: XmlDocument;
+  resources: XmlElement;
+  spans: Map<string, Span>;
+}
+
+/**
+ * Applies `entries` to an existing translation file as text edits: changed elements are
+ * replaced in place, new ones go after their nearest neighbour in source order, and
+ * everything else (comments, blank lines, formatting) is left exactly as it was.
+ */
+function spliceEntries(
+  file: LocaleFile,
+  entries: Entry[],
+  existing: Map<string, Entry>,
+  sourceOrder: string[],
+): string {
+  const src = file.doc.source;
+  const eol = src.includes("\r\n") ? "\r\n" : "\n";
+  const lineIndent = (offset: number) =>
+    /[ \t]*$/.exec(src.slice(src.lastIndexOf("\n", offset - 1) + 1, offset))?.[0] ?? "";
+  const first = [...file.spans.values()].sort((a, b) => a.start - b.start)[0];
+  const indent = first ? lineIndent(first.start) : INDENT;
+  // Elements sit one level inside <resources>, so their indent is also the file's step.
+  const step = indent || INDENT;
+  const edits: Array<{ at: number; end: number; text: string }> = [];
+
+  for (const entry of entries) {
+    const span = file.spans.get(entry.key);
+    if (span) {
+      const before = existing.get(entry.key);
+      const same =
+        before &&
+        JSON.stringify(before.message) === JSON.stringify(entry.message) &&
+        JSON.stringify(before.attrs ?? {}) === JSON.stringify(entry.attrs ?? {});
+      if (!same) {
+        // Keep attributes the file had (e.g. Google's `msgid`), then any new modeled ones.
+        const attrs = Object.fromEntries(span.attrs);
+        for (const [k, v] of Object.entries(entry.attrs ?? {})) attrs[k] = v;
+        const text = renderEntry({ ...entry, attrs }, lineIndent(span.start), eol, step);
+        edits.push({ at: span.start, end: span.end, text });
+      }
+      continue;
+    }
+    const position = sourceOrder.indexOf(entry.key);
+    const previous = sourceOrder
+      .slice(0, Math.max(position, 0))
+      .reverse()
+      .map((k) => file.spans.get(k))
+      .find((x) => x !== undefined);
+    const element = renderEntry(entry, indent, eol, step);
+    if (previous)
+      edits.push({ at: previous.end, end: previous.end, text: `${eol}${indent}${element}` });
+    else if (first)
+      edits.push({ at: first.start, end: first.start, text: `${element}${eol}${indent}` });
+    else
+      edits.push({
+        at: file.resources.innerEnd,
+        end: file.resources.innerEnd,
+        text: `${indent}${element}${eol}`,
+      });
+  }
+
+  // Declare the xliff namespace if new content needs it.
+  if (usesXliff(entries) && !("xmlns:xliff" in file.resources.attrs)) {
+    const close = src.indexOf(">", file.resources.start);
+    const at = src[close - 1] === "/" ? close - 1 : close;
+    edits.push({ at, end: at, text: ` xmlns:xliff="${XLIFF_NS}"` });
+  }
+
+  let out = src;
+  // Same-offset inserts keep entry order: apply later entries first.
+  const ordered = edits.map((e, i) => ({ ...e, i })).sort((a, b) => b.at - a.at || b.i - a.i);
+  for (const e of ordered) out = out.slice(0, e.at) + e.text + out.slice(e.end);
+  return out;
 }
