@@ -17,7 +17,7 @@ You translate. Don't edit translation files by hand.
 - If `localship_*` MCP tools are available, use them: `localship_next_batch`, `localship_submit`, …
 - Otherwise run the CLI: `localship <command>`. If it isn't installed, ask to install it once with
   `npm install -g github:jigarfumakiya/localship`.
-- No `localship.yaml`? Run the `localship-setup` skill first.
+- No `.localship/config.yaml`? Run the `localship-setup` skill first.
 - A language that isn't configured yet: `localship add-locale <code>` first.
 - Check `git status` first and mention uncommitted changes, so the translation diff stays reviewable.
 

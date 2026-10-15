@@ -93,7 +93,7 @@ export function createServer(opts: ServerOptions): McpServer {
 
   tool(
     "localship_start",
-    "Do the setup step of a confirmed plan in one call: creates localship.yaml (or adds the languages to it), and writes default voice notes and a glossary of names to keep, without overwriting existing ones. Then draft the brief if there is none, and translate.",
+    "Do the setup step of a confirmed plan in one call: creates .localship/config.yaml (or adds the languages to it), and writes default voice notes and a glossary of names to keep, without overwriting existing ones. Then draft the brief if there is none, and translate.",
     {
       cwd: cwdArg,
       locales: z.array(z.string()).min(1).describe("Languages, as codes or names"),
@@ -157,7 +157,7 @@ export function createServer(opts: ServerOptions): McpServer {
 
   tool(
     "localship_init",
-    "Write localship.yaml from what localship_detect found. Ask the user which setups and languages they want first.",
+    "Write .localship/config.yaml from what localship_detect found. Ask the user which setups and languages they want first.",
     {
       cwd: cwdArg,
       accept: z
@@ -313,7 +313,7 @@ ${TRANSLATION_RULES}`,
 
   tool(
     "localship_translate",
-    "Translate everything missing with a separate model API (configured under models: in localship.yaml, or pass model as provider:model). Use for large catalogs; needs the provider's API key in the environment.",
+    "Translate everything missing with a separate model API (configured under models: in .localship/config.yaml, or pass model as provider:model). Use for large catalogs; needs the provider's API key in the environment.",
     {
       cwd: cwdArg,
       locales: localesArg,

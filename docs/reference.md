@@ -19,7 +19,7 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 | `localship plan [languages…]` | One plan for a request: what it found, blockers and their fix, strings to translate, defaults (voice per language, names kept), steps. Writes nothing. Languages can be names (`hindi`) or codes |
 | `localship start <languages…>` | Does the setup in one go: config (or adds the languages), default voice notes and glossary, never overwriting yours. With `--model` (or `models.default` in the config) it translates right away |
 | `localship detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
-| `localship init` | Detects, asks, and writes `localship.yaml` |
+| `localship init` | Detects, asks, and writes `.localship/config.yaml` |
 | `localship status` | Progress per target and locale |
 | `localship add-locale fr,de` | Adds languages to `locales:` in the config, keeping its comments |
 | `localship validate` | Runs every check. Exit code 1 if there are errors |
@@ -48,7 +48,7 @@ Options:
 | `--strict` | `validate` | Untranslated strings and missing locales count as errors |
 | `-y, --yes`, `--accept 1,2` | `init` | Accept the detected setups, or only these |
 | `--source en`, `-l, --locales hi,ar` | `init` | Source language and languages to translate into |
-| `-c, --config <file>` | all | Config file (default: the nearest `localship.yaml`) |
+| `-c, --config <file>` | all | Config file (default: the nearest `.localship/config.yaml`) |
 | `-C, --cwd <dir>` | all | Directory to run in |
 
 ## MCP tools
@@ -149,6 +149,21 @@ whole words in the source. In translations, fixed terms are matched inside words
 Arabic and Hindi attach particles.
 
 ## Configuration
+
+Everything Localship keeps in your repo is in one hidden folder at its root:
+
+```
+.localship/
+  config.yaml     languages and translation files (below)
+  brief.md        what the app is, who it's for, its tone
+  voice/          <locale>.md: formality and style per language
+  glossary.yaml   names to keep, and fixed translations of terms
+  lock.json       what was translated from which source text, and its review state
+```
+
+Commit all of it: the lockfile is how teammates and CI know what's new, changed or edited by
+hand. Paths in the config are relative to the repo root. A `localship.yaml` at the root (the
+older location) is still read.
 
 | Key | Default | Meaning |
 |---|---|---|

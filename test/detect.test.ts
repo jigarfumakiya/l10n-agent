@@ -183,7 +183,7 @@ describe("init", () => {
     const fs = repo();
     const code = await runInit(fs, { cwd: "/r", yes: true }, io());
     expect(code).toBe(0);
-    const config = parseYaml(fs.files.get("/r/localship.yaml") ?? "");
+    const config = parseYaml(fs.files.get("/r/.localship/config.yaml") ?? "");
     expect(config).toEqual({
       sourceLocale: "en",
       locales: ["ar", "hi"],
@@ -202,7 +202,7 @@ describe("init", () => {
     expect(await runInit(fs, { cwd: "/r", accept: [3], locales: ["hi"], source: "en" }, io())).toBe(
       0,
     );
-    expect(parseYaml(fs.files.get("/r/localship.yaml") ?? "")).toEqual({
+    expect(parseYaml(fs.files.get("/r/.localship/config.yaml") ?? "")).toEqual({
       sourceLocale: "en",
       locales: ["hi"],
       targets: [{ format: "po", path: "locale/{locale}/LC_MESSAGES/django.po" }],
@@ -213,7 +213,7 @@ describe("init", () => {
     const fs = repo();
     const terminal = io(["1", "", "hi, ar"], true);
     expect(await runInit(fs, { cwd: "/r" }, terminal)).toBe(0);
-    expect(parseYaml(fs.files.get("/r/localship.yaml") ?? "")).toMatchObject({
+    expect(parseYaml(fs.files.get("/r/.localship/config.yaml") ?? "")).toMatchObject({
       locales: ["hi", "ar"],
       targets: [{ format: "android-xml", path: "app/src/main/res" }],
     });
@@ -224,15 +224,15 @@ describe("init", () => {
     const fs = repo();
     const quiet = io();
     expect(await runInit(fs, { cwd: "/r" }, quiet)).toBe(2);
-    expect(fs.files.has("/r/localship.yaml")).toBe(false);
+    expect(fs.files.has("/r/.localship/config.yaml")).toBe(false);
     expect(quiet.err[0]).toMatch(/--yes/);
   });
 
   it("never overwrites a config unless forced", async () => {
     const fs = repo();
-    fs.files.set("/r/localship.yaml", "mine");
+    fs.files.set("/r/.localship/config.yaml", "mine");
     expect(await runInit(fs, { cwd: "/r", yes: true }, io())).toBe(2);
-    expect(fs.files.get("/r/localship.yaml")).toBe("mine");
+    expect(fs.files.get("/r/.localship/config.yaml")).toBe("mine");
     expect(await runInit(fs, { cwd: "/r", yes: true, force: true }, io())).toBe(0);
   });
 
@@ -242,7 +242,7 @@ describe("init", () => {
     expect(await runInit(fs, { cwd: "/r", accept: [9] }, bad)).toBe(2);
     expect(bad.err[0]).toMatch(/no setup 9/);
     expect(await runInit(fs, { cwd: "/r", yes: true, locales: ["not a locale"] }, bad)).toBe(2);
-    expect(fs.files.has("/r/localship.yaml")).toBe(false);
+    expect(fs.files.has("/r/.localship/config.yaml")).toBe(false);
   });
 
   it("explains what to do when nothing is found", async () => {

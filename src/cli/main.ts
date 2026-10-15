@@ -38,7 +38,7 @@ const program = new Command()
   .description("Local-first, agent-native localization for apps")
   // Filled in by the build; `npm run dev` runs unbundled source.
   .version(VERSION)
-  .option("-c, --config <file>", "path to localship.yaml (default: nearest one)")
+  .option("-c, --config <file>", "path to the config (default: the nearest .localship/config.yaml)")
   .option("-C, --cwd <dir>", "directory to run in", process.cwd());
 
 const globals = () => program.opts<{ config?: string; cwd: string }>();
@@ -120,7 +120,7 @@ program
       for (const line of describeNone(result)) console.log(line);
     } else {
       for (const line of describeDetect(result)) console.log(line);
-      console.log("\nNext: `localship init` writes these into localship.yaml.");
+      console.log("\nNext: `localship init` writes these into .localship/config.yaml.");
     }
   });
 
@@ -459,12 +459,12 @@ const setupNumbers = (v: string) => {
 
 program
   .command("init")
-  .description("Detect translation files and write localship.yaml")
+  .description("Detect translation files and write .localship/config.yaml")
   .option("-y, --yes", "accept the detected setups without asking")
   .option("--accept <numbers>", "only these setups from `localship detect`, e.g. 1,2", setupNumbers)
   .option("--source <locale>", "source language (default: detected, else en)")
   .option("-l, --locales <list>", "languages to translate into, e.g. hi,ar", locales)
-  .option("--force", "replace an existing localship.yaml")
+  .option("--force", "replace an existing .localship/config.yaml")
   .option("--json", "machine-readable output")
   .action(
     async (opts: {

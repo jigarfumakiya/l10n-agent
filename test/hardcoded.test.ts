@@ -75,7 +75,7 @@ describe("hardcoded text", () => {
 
   it("adds a note to status for a set-up project that is still mostly in code", async () => {
     const fs = app({
-      "/r/localship.yaml":
+      "/r/.localship/config.yaml":
         "locales: [hi]\ntargets:\n  - format: android-xml\n    path: app/src/main/res\n",
     });
     const notes = await hardcodedNotes(await openProject(fs, { cwd: "/r" }));
@@ -96,7 +96,7 @@ describe("init on a mostly hardcoded app", () => {
       ask: async (_q: string, f: string) => f,
     };
     expect(await runInit(fs, { cwd: "/r", yes: true, locales: ["hi"] }, io)).toBe(0);
-    expect(fs.files.has("/r/localship.yaml")).toBe(true);
+    expect(fs.files.has("/r/.localship/config.yaml")).toBe(true);
     const text = out.join("\n");
     expect(text).toMatch(/about 12 pieces of UI text are still written in the code/);
     expect(text).toMatch(/Next: move the text into resources/);

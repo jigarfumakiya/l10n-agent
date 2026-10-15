@@ -26,8 +26,18 @@ describe("config", () => {
 
   it("says how to start when there is no config", async () => {
     await expect(loadConfig(memoryFs({ "/x/a": "" }), "/x")).rejects.toThrow(
-      /No localship\.yaml found[\s\S]*localship detect[\s\S]*localship init/,
+      /No Localship config \(\.localship\/config\.yaml\) found[\s\S]*localship detect[\s\S]*localship init/,
     );
+  });
+
+  it("reads .localship/config.yaml with paths from the repo root, and prefers it", async () => {
+    const yaml = "targets:\n  - format: android-xml\n    path: res\n";
+    const fs = memoryFs({ "/app/.localship/config.yaml": yaml, "/app/localship.yaml": "bad: [" });
+    const found = await loadConfig(fs, "/app/src");
+    expect(found.file).toBe(path.resolve("/app/.localship/config.yaml"));
+    expect(found.root).toBe(path.resolve("/app"));
+    const explicit = await loadConfig(fs, "/", "app/.localship/config.yaml");
+    expect(explicit.root).toBe(path.resolve("/app"));
   });
 });
 

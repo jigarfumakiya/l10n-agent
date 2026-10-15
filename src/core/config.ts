@@ -5,9 +5,20 @@ import { UserError } from "./errors.js";
 import type { FileSystem } from "./fs.js";
 import { PLACEHOLDER_SYNTAXES } from "./placeholders.js";
 
-export const CONFIG_FILE = "localship.yaml";
+/** Inside the Localship folder, so a project gains one hidden folder at its root and nothing else. */
+export const CONFIG_FILE = ".localship/config.yaml";
+/** Where the config lived before it moved into the folder; still read. */
+export const ROOT_CONFIG_FILE = "localship.yaml";
 /** The name before the project was called Localship; still read, with its `.l10n` folder. */
 export const LEGACY_CONFIG_FILE = "l10n.config.yaml";
+/** Config files Localship reads, in order of preference. */
+export const CONFIG_FILES = [CONFIG_FILE, ROOT_CONFIG_FILE, LEGACY_CONFIG_FILE];
+
+/** The directory paths in a config are relative to: the repo root, not the `.localship` folder. */
+export function configRoot(file: string): string {
+  const dir = path.dirname(file);
+  return path.basename(dir) === path.dirname(CONFIG_FILE) ? path.dirname(dir) : dir;
+}
 
 const locale = z.string().transform((s, ctx) => {
   try {
@@ -167,7 +178,7 @@ export interface LoadedConfig {
   file: string;
 }
 
-/** Finds `localship.yaml` in `cwd` or the nearest parent, unless a path is given. */
+/** Finds `.localship/config.yaml` (or `localship.yaml`) in `cwd` or the nearest parent, unless a path is given. */
 export async function loadConfig(
   fs: FileSystem,
   cwd: string,
@@ -179,7 +190,7 @@ export async function loadConfig(
     if (!(await fs.exists(file))) throw new ConfigError(`Config not found: ${file}`);
   } else {
     search: for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
-      for (const name of [CONFIG_FILE, LEGACY_CONFIG_FILE]) {
+      for (const name of CONFIG_FILES) {
         const candidate = path.join(dir, name);
         if (await fs.exists(candidate)) {
           file = candidate;
@@ -190,7 +201,7 @@ export async function loadConfig(
     }
     if (!file)
       throw new ConfigError(
-        `No ${CONFIG_FILE} found in ${cwd} or its parents, so Localship isn't set up here yet. Run \`localship detect\` to see what's in this repo, then \`localship init\` to set it up.`,
+        `No Localship config (${CONFIG_FILE}) found in ${cwd} or its parents, so Localship isn't set up here yet. Run \`localship detect\` to see what's in this repo, then \`localship init\` to set it up.`,
       );
   }
 
@@ -217,7 +228,7 @@ export async function loadConfig(
     });
     throw new ConfigError(`${file} is invalid:\n${details.join("\n")}`);
   }
-  return { config: parsed.data, root: path.dirname(file), file };
+  return { config: parsed.data, root: configRoot(file), file };
 }
 
 /**

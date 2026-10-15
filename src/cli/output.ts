@@ -171,7 +171,7 @@ export function describeNone(result: DetectResult): string[] {
   lines.push(
     "",
     dim(
-      "You can also write localship.yaml by hand: https://github.com/jigarfumakiya/localship/blob/main/docs/reference.md#configuration",
+      "You can also write .localship/config.yaml by hand: https://github.com/jigarfumakiya/localship/blob/main/docs/reference.md#configuration",
     ),
   );
   return lines;

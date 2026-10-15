@@ -109,8 +109,8 @@ The details are in RESEARCH.md §3.
 ## 5. Files in an app repo
 
 ```
-localship.yaml
 .localship/
+  config.yaml       languages and targets
   brief.md          what the app is, audience, tone. Drafted by the setup skill from README and store listing
   voice/            <locale>.md: formality, tone, things to avoid (e.g. German du vs Sie)
   glossary.yaml     do-not-translate terms + fixed translations per locale, matched case- and Unicode-aware
@@ -121,7 +121,7 @@ localship.yaml
 ```
 
 ```yaml
-# localship.yaml (an Android app)
+# .localship/config.yaml (an Android app)
 sourceLocale: en
 locales: [hi, ar]
 targets:

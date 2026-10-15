@@ -1,6 +1,6 @@
 ---
 name: localship-setup
-description: Set up localization for an app repo with Localship — whether it already has translations, has string resources but no translations, or has its text hardcoded. Finds the translation files, writes localship.yaml, and drafts the brief, voice and glossary translators need. Use when a project has no localship.yaml yet, or the user asks to add languages or set up translation.
+description: Set up localization for an app repo with Localship — whether it already has translations, has string resources but no translations, or has its text hardcoded. Finds the translation files, writes .localship/config.yaml, and drafts the brief, voice and glossary translators need. Use when a project has no .localship/config.yaml yet, or the user asks to add languages or set up translation.
 ---
 
 # Set up localization with Localship

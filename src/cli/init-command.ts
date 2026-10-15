@@ -1,5 +1,5 @@
 import path from "node:path";
-import { CONFIG_FILE, LEGACY_CONFIG_FILE } from "../core/config.js";
+import { CONFIG_FILE, LEGACY_CONFIG_FILE, ROOT_CONFIG_FILE } from "../core/config.js";
 import type { FileSystem } from "../core/fs.js";
 import { detect, mostlyHardcoded } from "../detect/detect.js";
 import {
@@ -37,11 +37,13 @@ export async function runInit(fs: FileSystem, opts: InitOptions, io: Io): Promis
     io.error(`${CONFIG_FILE} already exists in ${root}. Use --force to replace it.`);
     return 2;
   }
-  if (await fs.exists(path.join(root, LEGACY_CONFIG_FILE))) {
-    io.error(
-      `${LEGACY_CONFIG_FILE} already sets this project up, and Localship still reads it. Rename it to ${CONFIG_FILE} if you like; nothing else needs to change.`,
-    );
-    return 2;
+  for (const older of [ROOT_CONFIG_FILE, LEGACY_CONFIG_FILE]) {
+    if (await fs.exists(path.join(root, older))) {
+      io.error(
+        `${older} already sets this project up, and Localship still reads it. Move it to ${CONFIG_FILE} if you like; nothing else needs to change.`,
+      );
+      return 2;
+    }
   }
 
   const result = await detect(fs, root);
