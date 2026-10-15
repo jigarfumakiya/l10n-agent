@@ -278,10 +278,32 @@ export function checkTranslation(
     const allowed = new Set(
       Object.values(s.forms).flatMap((v) => target.analyze(v, src).placeholders.map((p) => p.id)),
     );
+    // Numbers the source's last form shows ("%d notes"): a form covering several counts needs them.
+    const counts =
+      pluralValue === undefined
+        ? []
+        : target
+            .analyze(pluralValue, src)
+            .placeholders.filter((p) => /^l{0,2}[diu]$/.test(p.type ?? ""));
     for (const [id, tv] of Object.entries(t.forms)) {
-      const countImplied = spec?.forms.find((f) => f.id === id)?.countImplied ?? false;
+      const form = spec?.forms.find((f) => f.id === id);
+      const countImplied = form?.countImplied ?? false;
       const sv = s.forms[id] ?? (countImplied ? singular : pluralValue);
       if (sv !== undefined) out.push(...compare(sv, tv, id, countImplied, allowed));
+      // English "one" may drop the number because it only means 1, but Hindi or French "one"
+      // also covers 0, so a copied "one day" would show for zero days too.
+      if (!form || countImplied || form.decimalOnly || sv === undefined) continue;
+      const inSource = new Set(target.analyze(sv, src).placeholders.map((p) => p.id));
+      const inTarget = new Set(target.analyze(tv, src).placeholders.map((p) => p.id));
+      for (const p of counts) {
+        if (inSource.has(p.id) || inTarget.has(p.id)) continue;
+        out.push({
+          severity: "error",
+          code: "plural-count-missing",
+          message: `${locale} uses this form for ${form.examples}, so it needs ${p.raw} to show which`,
+          form: id,
+        });
+      }
     }
     return out;
   }

@@ -164,6 +164,42 @@ describe("submit", () => {
     expect(r.rejected[0]?.errors[0]?.message).toMatch(/zero.*two.*few.*many/);
   });
 
+  it("needs the number in a form that covers more than one count, even if English drops it", async () => {
+    const fs = project({
+      "/p/app/src/main/res/values/strings.xml": `<resources>
+    <plurals name="months">
+        <item quantity="one">average of the last month</item>
+        <item quantity="other">average of the last %d months</item>
+    </plurals>
+</resources>`,
+    });
+    const r = await submit(await open(fs), [
+      // Hindi "one" is used for 0 and 1; Arabic "one" only for 1.
+      {
+        locale: "hi",
+        key: "months",
+        value: { one: "बीते महीने का औसत", other: "बीते %d महीनों का औसत" },
+      },
+      {
+        locale: "ar",
+        key: "months",
+        value: {
+          zero: "لا أشهر",
+          one: "متوسط الشهر الماضي",
+          two: "متوسط الشهرين الماضيين",
+          few: "متوسط آخر %d أشهر",
+          many: "متوسط آخر %d شهرًا",
+          other: "متوسط آخر %d شهر",
+        },
+      },
+    ]);
+    expect(r.rejected.map((x) => x.locale)).toEqual(["hi"]);
+    expect(r.rejected[0]?.errors.map((e) => [e.code, e.form])).toEqual([
+      ["plural-count-missing", "one"],
+    ]);
+    expect(r.rejected[0]?.errors[0]?.message).toMatch(/0, 1.*%d/);
+  });
+
   it("rejects unknown keys, untranslatable strings, the wrong shape and other locales", async () => {
     const r = await submit(await open(project()), [
       { locale: "hi", key: "nope", value: "x" },

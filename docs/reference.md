@@ -252,6 +252,7 @@ Errors are things that break the build or the app at runtime. Warnings are thing
 | Code | Severity | What |
 |---|---|---|
 | `placeholder-missing`, `placeholder-extra`, `placeholder-type` | error | Placeholders must match the source. In a plural form used for a single number (Arabic `two`), writing the number out instead is fine (`placeholder-implied`, info) |
+| `plural-count-missing` | error | A plural form used for more than one count must show the number, even when the source's form of the same name doesn't. English `one` only means 1, but Hindi and French `one` also cover 0, so "last month" copied from English would show for zero months |
 | `plural-missing-category` | error / warning | Every plural form the locale needs. Error for gettext and for a missing `other`. Warning when the app would fall back to `other`, or the form is only used for fractions |
 | `plural-extra-category` | warning / error | A form the locale never uses (error for gettext, which rejects it) |
 | `escape-apostrophe`, `escape-quote`, `escape-leading-reference`, `escape-invalid` | error | Android escaping |
