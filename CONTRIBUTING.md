@@ -54,6 +54,3 @@ a fixture with deliberate mistakes in `fixtures/`.
 ## Before a pull request
 
 `npm run check` must pass (typecheck, lint, tests). CI runs it on Linux, macOS and Windows.
-
-The product plan is in [PLAN.md](PLAN.md); the comparison with paid tools in
-[RESEARCH.md](RESEARCH.md).
