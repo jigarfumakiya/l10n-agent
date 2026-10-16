@@ -11,15 +11,15 @@ Free and open source · No account, no server · Any AI model · Every translati
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Highlights](#-highlights) · [Use it](#-use-it) · [Install](#-install) · [Formats](#-formats) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
+[Highlights](#-highlights) · [See it in action](#-see-it-in-action) · [How it works](#-how-it-works) · [Install](#-install) · [What you can ask](#-what-you-can-ask) · [Formats](#-formats) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
 
 </div>
 
 ---
 
-Localship lets your coding agent localize your app properly. It finds your translation files,
-gives the AI the context it needs, checks every translation before it touches your files, and
-remembers what's been done, so the next update only redoes what changed.
+Ask your coding agent to translate your app. Localship gives it the context it needs, checks
+every translation before it's written, and remembers what's done, so updates only redo what
+changed.
 
 > [!NOTE]
 > **Early days.** Localship is new. It's tested on real-world translation files and a real app,
@@ -36,10 +36,6 @@ remembers what's been done, so the next update only redoes what changed.
   checked in code before anything is written. Failures go back to the AI with the reason.
 - 🧠 **More context for the AI.** Each string comes with the code that uses it, its comment, your
   glossary and voice notes, and earlier translations of the same text.
-- 🔁 **Only redoes what changed.** It tracks what's new, what changed and what someone edited by
-  hand, so updates are quick.
-- ✋ **People stay in charge.** Translations land as drafts for review. Hand edits and approved
-  translations are never overwritten unless you ask.
 - 🔒 **Stays in your repo.** No server, no account, no upload. Your files, written the way Android
   Studio and Xcode write them.
 - 💻 **Runs anywhere.** Claude Code, Cursor, VS Code, Codex, Gemini CLI, Claude Desktop or the
@@ -58,22 +54,107 @@ Your AI can already translate a strings file if you ask. Here's what changes wit
 | Changing copy | Everything is translated again | Only changed strings are redone, with the old and new text |
 | Your translator's fixes | Overwritten | Kept unless you ask |
 
-## 💬 Use it
+## 🎬 See it in action
 
-Once it's [installed](#-install), open your app's repo and ask in plain words. You get one short plan: what it found, what it will
-do, and the defaults it picked. Say "start translating" and it runs to the end, then review and
-approve.
+How a run goes on a small Android app, from the first request to approved translations. You talk
+to your coding agent as usual; Localship does the finding, checking and bookkeeping behind it.
+
+**1. Ask in plain words.** Localship looks at your repo and the agent comes back with one short
+plan, so nothing changes until you agree.
 
 ```
 You:    Translate this app into Hindi and Arabic.
-Agent:  Found 18 strings in app/src/main/res. Here's the plan: a short brief and glossary,
-        formal Hindi, "Jotter Pro" kept as written. Say "start translating" to go.
-You:    Start translating.
-Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural forms.
-You:    Review the Arabic, then approve them.
+Agent:  Found 18 strings in app/src/main/res (2 plurals, 3 with placeholders).
+        • A short brief, voice notes and glossary go in .localship/, for you to edit
+        • "Jotter Pro" is kept as written
+        Say "start translating" to go.
 ```
 
-<sub>From the example app in [examples/android-notes](examples/android-notes).</sub>
+**2. Say "start translating".** The agent translates in small batches, each with the code that
+uses the string, its comment and your glossary. Every batch is checked before anything is
+written; a translation that fails goes back to the AI with the reason.
+
+```
+You:    Start translating.
+Agent:  36 translations written as drafts, 0 errors.
+        Arabic has all six plural forms, and every %1$s placeholder is in place.
+```
+
+**3. Review, then approve.** Drafts stay drafts until you say so.
+
+```
+You:    Review the Arabic translations.
+Agent:  Two suggestions: … The rest read well. Approve them?
+You:    Approve them.
+```
+
+**4. Next time, only what changed.** Localship remembers what was translated from which text,
+and what you edited by hand.
+
+```
+You:    I reworded two buttons. Update the translations.
+Agent:  2 strings changed since they were translated, so I updated those in Hindi and Arabic.
+        Your hand edit to "sync_pro" in Hindi was kept.
+```
+
+## 🔍 How it works
+
+```mermaid
+flowchart LR
+    A[📁 Your repo] --> B[🔎 Find strings]
+    B --> C[🧠 Batch + context<br/><sub>code usage · comments<br/>glossary · voice · memory</sub>]
+    C --> D[🤖 AI translates<br/><sub>your agent or any model</sub>]
+    D --> E{🛡️ Checks<br/><sub>placeholders · plurals<br/>escaping · markup</sub>}
+    E -- fails --> D
+    E -- passes --> F[📝 Drafts in your files]
+    F --> G[👀 Review] --> H[✅ Approved]
+```
+
+Setup adds one folder to your repo. Commit it: the brief, glossary and voice notes are yours to
+edit, and the lockfile is how Localship knows what's new, what changed and what someone edited by
+hand.
+
+```
+.localship/
+├── config.yaml     where your strings live, and which languages
+├── brief.md        what the app is and who it's for
+├── glossary.yaml   terms to keep as they are or translate one way
+├── voice/          tone and formality per language
+└── lock.json       what was translated from which text
+```
+
+## 🚀 Install
+
+Needs [Node.js](https://nodejs.org) 22 or newer.
+
+**Claude Code:** install the plugin, which includes the server and the skills.
+
+```
+/plugin marketplace add jigarfumakiya/localship
+/plugin install localship@localship
+```
+
+**Other tools:** add Localship as an MCP server.
+
+```json
+{ "mcpServers": { "localship": { "command": "npx", "args": ["-y", "github:jigarfumakiya/localship", "mcp"] } } }
+```
+
+| Tool | Where the config goes |
+|---|---|
+| Cursor | `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` |
+| VS Code | `.vscode/mcp.json`, with `"servers"` instead of `"mcpServers"` and `"type": "stdio"` added |
+| Gemini CLI | `.gemini/settings.json` |
+| Codex | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "github:jigarfumakiya/localship", "mcp"]` |
+| Claude Desktop | `claude_desktop_config.json`, with `"-C", "/path/to/your/app"` added before `"mcp"` |
+| Terminal and CI | `npm install -g github:jigarfumakiya/localship` (see [Terminal and CI](#%EF%B8%8F-terminal-and-ci)) |
+
+Agents that read skills (Codex, Cursor, Gemini CLI…) also get step-by-step playbooks with
+`npx skills add jigarfumakiya/localship`. The first start takes a minute while it installs.
+
+## 💬 What you can ask
+
+Wherever your app is today, one sentence gets it started.
 
 | Your app today | Just ask |
 |---|---|
@@ -84,92 +165,6 @@ You:    Review the Arabic, then approve them.
 | ✏️ You changed some copy | "Update the translations." Only changed strings are redone |
 | 🧹 You deleted or renamed strings | "Clean up old translations." |
 | 👀 Ready to check the result | "Review the Arabic translations." |
-
-## 🚀 Install
-
-**Claude Code** (recommended): install the plugin, which includes the server and the skills.
-
-```
-/plugin marketplace add jigarfumakiya/localship
-/plugin install localship@localship
-```
-
-**Any other MCP tool**: add this server config.
-
-```json
-{
-  "mcpServers": {
-    "localship": { "command": "npx", "args": ["-y", "github:jigarfumakiya/localship", "mcp"] }
-  }
-}
-```
-
-<details>
-<summary><b>Cursor</b></summary>
-
-Put the config above in `.cursor/mcp.json` in your project, or in `~/.cursor/mcp.json` for every project.
-</details>
-
-<details>
-<summary><b>VS Code</b></summary>
-
-Put this in `.vscode/mcp.json`:
-
-```json
-{
-  "servers": {
-    "localship": { "type": "stdio", "command": "npx", "args": ["-y", "github:jigarfumakiya/localship", "mcp"] }
-  }
-}
-```
-</details>
-
-<details>
-<summary><b>Codex</b></summary>
-
-Add to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.localship]
-command = "npx"
-args = ["-y", "github:jigarfumakiya/localship", "mcp"]
-```
-</details>
-
-<details>
-<summary><b>Gemini CLI</b></summary>
-
-Put the config above in `.gemini/settings.json`.
-</details>
-
-<details>
-<summary><b>Claude Desktop</b></summary>
-
-Use the config above, with `"-C", "/path/to/your/app"` before `"mcp"` so it knows which app to work on.
-</details>
-
-<details>
-<summary><b>Agent skills</b> (Claude Code, Codex, Cursor, Gemini CLI…)</summary>
-
-Skills are step-by-step playbooks for setting up, making an app localizable, translating and
-reviewing. The Claude Code plugin includes them; for other agents:
-
-```sh
-npx skills add jigarfumakiya/localship
-```
-</details>
-
-<details>
-<summary><b>Terminal and CI</b></summary>
-
-```sh
-npm install -g github:jigarfumakiya/localship
-```
-
-See [Without an agent](#%EF%B8%8F-without-an-agent).
-</details>
-
-⏱️ The first start takes a minute while it installs; after that it's quick.
 
 ## 📦 Formats
 
@@ -186,7 +181,7 @@ See [Without an agent](#%EF%B8%8F-without-an-agent).
 Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
 all supported.
 
-## ⌨️ Without an agent
+## ⌨️ Terminal and CI
 
 Everything also works from the terminal, which is handy for big apps and CI:
 
@@ -198,38 +193,32 @@ localship validate                                          # exits 1 on errors:
 localship approve --locale hi                               # after review
 ```
 
-Every command, option and config key is in the [reference](docs/reference.md).
+To fail pull requests that break a placeholder or a plural form, add a step to your GitHub
+Actions workflow:
 
-## 🔍 How it works
-
-```mermaid
-flowchart LR
-    A[📁 Your repo] --> B[🔎 Find strings]
-    B --> C[🧠 Batch + context<br/><sub>code usage · comments<br/>glossary · voice · memory</sub>]
-    C --> D[🤖 AI translates<br/><sub>your agent or any model</sub>]
-    D --> E{🛡️ Checks<br/><sub>placeholders · plurals<br/>escaping · markup</sub>}
-    E -- fails --> D
-    E -- passes --> F[📝 Drafts in your files]
-    F --> G[👀 Review] --> H[✅ Approved]
+```yaml
+- uses: actions/setup-node@v4
+  with:
+    node-version: 22
+- run: npx -y github:jigarfumakiya/localship validate
 ```
 
-Translation state lives in a small `.localship/` folder in your repo (commit it), so the tool
-knows what's new, what changed and what someone edited by hand.
+Every command, option and config key is in the [reference](docs/reference.md).
 
 ## ❓ Questions
+
+<details>
+<summary><b>Can I try it before using it on my app?</b></summary>
+
+Yes. [examples/android-notes](examples/android-notes) is a small Android app with its Hindi and
+Arabic translations. Open it with Localship installed and ask your agent to add another language.
+</details>
 
 <details>
 <summary><b>Do I need an API key?</b></summary>
 
 No. Inside a coding agent, Localship uses the agent's own model. An API key is only needed to
 translate from the terminal or CI, and a local model through Ollama needs none at all.
-</details>
-
-<details>
-<summary><b>Why not just ask my agent to translate?</b></summary>
-
-For a handful of strings once, that's fine. Localship is for when you keep the app translated as
-it changes, and want the mistakes in [Why Localship?](#-why-localship) caught before they ship.
 </details>
 
 <details>
@@ -242,6 +231,14 @@ Only to the AI you choose. There's no Localship server.
 <summary><b>Will it overwrite my translators' work?</b></summary>
 
 No. Hand edits and anything approved are never replaced unless you explicitly ask.
+</details>
+
+<details>
+<summary><b>I have an iOS and an Android app. Can they share translations?</b></summary>
+
+Yes. One config can list both, and they share the same brief, glossary and voice notes. When the
+same text appears in both apps, the earlier translation is offered to the AI, so "Sign in"
+reads the same on both.
 </details>
 
 <details>
