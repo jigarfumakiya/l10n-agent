@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { memoryFs } from "../src/core/fs.js";
 import { hashMessage } from "../src/core/hash.js";
 import { openProject } from "../src/core/project.js";
-import { computeStatus } from "../src/core/status.js";
+import { computeStatus, statusNotes } from "../src/core/status.js";
 
 const text = (value: string) => ({ kind: "text" as const, value });
 
@@ -49,5 +49,20 @@ describe("status", () => {
       hand: "untracked",
       todo: "missing",
     });
+  });
+
+  it("notes duplicate keys and translations of deleted strings", async () => {
+    const fs = memoryFs({
+      "/app/localship.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/app/res/values/strings.xml":
+        '<resources><string name="a">A</string><string name="a">A again</string></resources>',
+      "/app/res/values-hi/strings.xml":
+        '<resources><string name="a">ए</string><string name="gone">गया</string></resources>',
+    });
+    const notes = statusNotes(await openProject(fs, { cwd: "/app" }));
+    expect(notes.map((n) => [n.locale, n.code, n.message])).toEqual([
+      [undefined, "duplicate-key", "1 key is defined twice; run `localship validate` for where"],
+      ["hi", "orphan", "1 translation of deleted strings; `localship prune` removes it"],
+    ]);
   });
 });

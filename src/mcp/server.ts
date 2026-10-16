@@ -11,7 +11,7 @@ import { UserError } from "../core/errors.js";
 import { type FileSystem, nodeFs } from "../core/fs.js";
 import { plan, start } from "../core/plan.js";
 import { openProject } from "../core/project.js";
-import { computeStatus, ENTRY_STATES } from "../core/status.js";
+import { computeStatus, ENTRY_STATES, statusNotes } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
 import {
   approve,
@@ -123,6 +123,7 @@ export function createServer(opts: ServerOptions): McpServer {
           path: t.target.label,
         })),
         status: computeStatus(p, locales).map(({ entries: _, ...s }) => s),
+        notes: statusNotes(p, locales),
         codeText: await hardcodedNotes(p),
       };
     },

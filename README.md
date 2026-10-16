@@ -34,9 +34,11 @@ Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural f
 <sub>From the example app in [examples/android-notes](examples/android-notes).</sub>
 
 > [!NOTE]
-> **Early days.** Localship is tested on real-world files (AndroidX resources, Django's
-> translations, open-source String Catalogs) and a small example app, but it hasn't been used to
-> ship a production app yet. Expect rough edges, and please [open an issue](https://github.com/jigarfumakiya/localship/issues) when you hit one.
+> **Early days.** Localship has localized one real app so far: StillMoney for Android, 1,385
+> strings and 58 plurals moved out of the code and translated into Hindi and Arabic, then updated
+> again after copy changes. Those languages haven't shipped to users yet, and the other formats
+> are tested on real-world files (Django's translations, open-source String Catalogs) rather
+> than a real app. Expect rough edges, and please [open an issue](https://github.com/jigarfumakiya/localship/issues) when you hit one.
 
 ## ✨ Highlights
 
@@ -218,12 +220,22 @@ meaning, so review the drafts, ideally with a native speaker. See a real result 
 </details>
 
 <details>
+<summary><b>Does it check right-to-left layout and cut-off text?</b></summary>
+
+Not yet. Localship checks the translation files, not how the app draws them. On StillMoney every
+Arabic string passed, but testing on a phone still found bugs in the app's code: charts that didn't
+mirror, minus signs on the wrong side of amounts, category names stored in English, and screens
+that kept the old language after a switch. The agent skills now tell the agent to look for these,
+but test right-to-left languages on a device before you ship.
+</details>
+
+<details>
 <summary><b>Is it ready?</b></summary>
 
 Not for production yet. Setup, translation, checks, review and cleanup work for the three supported
-formats on macOS, Linux and Windows, with about 190 automated tests and real-world sample files.
-It hasn't been used to ship a real app yet, and translating through a model API hasn't been tried
-against a live provider. See the [plan](PLAN.md) for what's next.
+formats on macOS, Linux and Windows, with over 200 automated tests and real-world sample files. One
+real Android app has been localized with it, but not shipped yet, and translating through a model
+API hasn't been tried against a live provider. See the [plan](PLAN.md) for what's next.
 </details>
 
 ## 🛣️ Roadmap

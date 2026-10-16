@@ -92,6 +92,11 @@ come out generic.
   failed, warnings you left and why, and terms you were unsure of.
 - **Don't approve your own drafts.** Suggest the user reviews them (the `localship-review` skill),
   then `localship approve`.
+- For a right-to-left language (Arabic, Hebrew, Persian, Urdu), or any first translation, tell the
+  user what still needs a device: the layout mirrored, long text cut off, plurals at 0, 1, 2, 5
+  and 11, switching language while the app is open, charts, amounts with a sign, and names
+  stored in data. Offer to look for these in the code (the `localship-extract` skill lists
+  them); Localship's checks only cover the translation files.
 - Never pass `--force` unless the user explicitly asks: it replaces translations a person
   wrote, reviewed or approved.
 

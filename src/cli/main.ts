@@ -6,7 +6,7 @@ import { UserError } from "../core/errors.js";
 import { nodeFs } from "../core/fs.js";
 import { plan, start } from "../core/plan.js";
 import { openProject } from "../core/project.js";
-import { computeStatus, ENTRY_STATES, type EntryState } from "../core/status.js";
+import { computeStatus, ENTRY_STATES, type EntryState, statusNotes } from "../core/status.js";
 import { validateProject } from "../core/validate.js";
 import {
   approve,
@@ -27,6 +27,7 @@ import {
   printIssues,
   printPlan,
   printStatus,
+  printStatusNotes,
   printSubmit,
 } from "./output.js";
 
@@ -79,11 +80,13 @@ program
   .action(async (opts: { locale?: string[]; json?: boolean }) => {
     const project = await openProject(nodeFs, globals());
     const status = computeStatus(project, opts.locale);
+    const notes = statusNotes(project, opts.locale);
     const codeText = await hardcodedNotes(project);
     if (opts.json) {
-      console.log(JSON.stringify({ status, codeText }, null, 2));
+      console.log(JSON.stringify({ status, notes, codeText }, null, 2));
     } else {
       printStatus(project, status);
+      printStatusNotes(notes);
       for (const n of codeText) console.log(`▲ ${n.target}: ${n.message}`);
     }
   });

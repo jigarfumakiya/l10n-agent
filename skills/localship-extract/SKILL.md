@@ -86,6 +86,27 @@ not translatable.
   Pseudolanguage"). Plain English left over was missed.
 - Ask the user to run these if you can't; list the screens to check.
 
+### Text the resource files can't show
+
+These passed every Localship check in a real app and were only found on a device. Search the code
+for them while you're in it:
+
+- **Names stored in data.** Categories, accounts or templates seeded in English and saved to a
+  database are shown as stored. Translate them at display time while they're still the seeded
+  value (a map from seeded name to string resource); never translate what the user typed.
+- **Text built once and kept.** View models, singletons and caches that build sentences keep the
+  old language after an in-app language switch. Rebuild them when the locale changes; on Android,
+  view models survive the activity being recreated for the new language.
+- **Charts drawn by hand.** A Canvas or custom drawing doesn't mirror in right-to-left languages,
+  but the labels laid out next to it do, so the bars end up under the wrong labels. Mirror the
+  drawing when the layout direction is right to left.
+- **Signs and symbols on amounts.** `"-" + amount` comes out as `$60-` in Arabic. Keep a signed
+  amount in one left-to-right run (wrap it in U+2066 … U+2069). Android's Arabic number
+  format also starts with an invisible right-to-left mark (U+200F), which can cut the symbol
+  off single-line figures; strip it.
+- **Dates and months** formatted with the device's locale instead of the app's: use the app's
+  locale so they follow an in-app language switch.
+
 ## 5. Then
 
 Run `localship detect` (or `localship_detect`): it should now find the strings. Continue with the

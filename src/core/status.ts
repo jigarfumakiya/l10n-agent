@@ -74,3 +74,51 @@ export function computeStatus(project: Project, locales = projectLocales(project
   }
   return out;
 }
+
+export interface StatusNote {
+  target: string;
+  locale?: string;
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+}
+
+/**
+ * Problems the counts above don't show: errors found while reading the files (a duplicate key
+ * counts as one string, so the table looks fine) and translations of strings that were deleted.
+ * Details are in `validate`; `prune` removes the leftovers.
+ */
+export function statusNotes(project: Project, locales = projectLocales(project)): StatusNote[] {
+  const notes: StatusNote[] = [];
+  for (const { target: loaded } of project.targets) {
+    const errors = loaded.issues.filter((i) => i.severity === "error");
+    const byCode = new Map<string, number>();
+    for (const e of errors) byCode.set(e.code, (byCode.get(e.code) ?? 0) + 1);
+    for (const [code, n] of byCode) {
+      const what =
+        code === "duplicate-key"
+          ? `key${n === 1 ? " is" : "s are"} defined twice`
+          : `file error${n === 1 ? "" : "s"} (${code})`;
+      notes.push({
+        target: loaded.id,
+        severity: "error",
+        code,
+        message: `${n} ${what}; run \`localship validate\` for where`,
+      });
+    }
+    for (const locale of locales) {
+      const catalog = loaded.locales.get(locale);
+      if (!catalog) continue;
+      const orphans = [...catalog.entries.keys()].filter((k) => !loaded.source.entries.has(k));
+      if (orphans.length === 0) continue;
+      notes.push({
+        target: loaded.id,
+        locale,
+        severity: "warning",
+        code: "orphan",
+        message: `${orphans.length} translation${orphans.length === 1 ? "" : "s"} of deleted strings; \`localship prune\` removes ${orphans.length === 1 ? "it" : "them"}`,
+      });
+    }
+  }
+  return notes;
+}

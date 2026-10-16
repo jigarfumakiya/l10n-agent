@@ -20,7 +20,7 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 | `localship start <languages…>` | Does the setup in one go: config (or adds the languages), default voice notes and glossary, never overwriting yours. With `--model` (or `models.default` in the config) it translates right away |
 | `localship detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
 | `localship init` | Detects, asks, and writes `.localship/config.yaml` |
-| `localship status` | Progress per target and locale |
+| `localship status` | Progress per target and locale, plus duplicate keys and translations of deleted strings |
 | `localship add-locale fr,de` | Adds languages to `locales:` in the config, keeping its comments |
 | `localship validate` | Runs every check. Exit code 1 if there are errors |
 | `localship next-batch` | The next strings needing translation, with context, as JSON |

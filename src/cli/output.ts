@@ -1,7 +1,7 @@
 import { displayKey, type Issue } from "../core/model.js";
 import type { Plan } from "../core/plan.js";
 import type { Project } from "../core/project.js";
-import { ENTRY_STATES, type LocaleStatus } from "../core/status.js";
+import { ENTRY_STATES, type LocaleStatus, type StatusNote } from "../core/status.js";
 import type { ApproveResult, SubmitResult } from "../core/workflow.js";
 import type { DetectResult } from "../detect/detect.js";
 
@@ -52,6 +52,13 @@ export function printStatus(project: Project, status: LocaleStatus[]): void {
         .join("\n"),
     );
     console.log();
+  }
+}
+
+export function printStatusNotes(notes: StatusNote[]): void {
+  for (const n of notes) {
+    const mark = n.severity === "error" ? red("✖") : yellow("▲");
+    console.log(`${mark} ${[n.target, n.locale].filter(Boolean).join(" ")}: ${n.message}`);
   }
 }
 
