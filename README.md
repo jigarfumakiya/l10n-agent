@@ -6,6 +6,7 @@
 
 Free and open source · No account, no server · Any AI model · Every translation checked
 
+[![npm](https://img.shields.io/npm/v/localship?color=cb3837&logo=npm)](https://www.npmjs.com/package/localship)
 [![CI](https://github.com/jigarfumakiya/localship/actions/workflows/ci.yml/badge.svg)](https://github.com/jigarfumakiya/localship/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
@@ -129,7 +130,10 @@ all supported.
 
 ## 🚀 Install
 
-Needs [Node.js](https://nodejs.org) 22 or newer.
+Localship has three parts: an **MCP server** (the tools that read, check and write your
+translations), **agent skills** (the workflow your agent follows) and a **command line**. For the
+full setup, give your agent the server and the skills. Needs [Node.js](https://nodejs.org) 22 or
+newer.
 
 ### ⭐ The easiest way
 
@@ -140,13 +144,18 @@ Needs [Node.js](https://nodejs.org) 22 or newer.
 /plugin install localship@localship
 ```
 
-**Codex, Cursor, Gemini CLI and other agents:** one command adds the Localship skills,
-step-by-step playbooks your agent follows. The first time, it offers to install the Localship
-command line it uses.
+**Cursor and VS Code:** add the server in one click, then add the skills.
+
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=localship&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImxvY2Fsc2hpcCIsIm1jcCJdfQ%3D%3D)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_server-0098FF?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522localship%2522%252C%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522localship%2522%252C%2522mcp%2522%255D%257D)
 
 ```sh
 npx skills add jigarfumakiya/localship
 ```
+
+**Codex, Gemini CLI and other agents:** add the server from [Other tools](#-other-tools) below,
+and the skills with the same command. Skills alone also work: your agent then uses the Localship
+command line and offers to install it the first time.
 
 Then open your app and ask: *"Translate this app into Hindi and Arabic."*
 
