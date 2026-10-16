@@ -30,7 +30,7 @@
   "author": "Jigar Fumakiya (https://github.com/jigarfumakiya)",
   "type": "module",
   "bin": {
-    "localship": "./dist/cli.js"
+    "localship": "dist/cli.js"
   },
   "files": [
     "dist/**/*.js",
