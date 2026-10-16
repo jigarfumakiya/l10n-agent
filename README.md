@@ -11,7 +11,7 @@ Free and open source · No account, no server · Any AI model · Every translati
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Highlights](#-highlights) · [See it in action](#-see-it-in-action) · [How it works](#-how-it-works) · [Install](#-install) · [What you can ask](#-what-you-can-ask) · [Formats](#-formats) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
+[Highlights](#-highlights) · [See it in action](#-see-it-in-action) · [How it works](#-how-it-works) · [What you can ask](#-what-you-can-ask) · [Formats](#-formats) · [Install](#-install) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
 
 </div>
 
@@ -97,6 +97,35 @@ hand.
 └── lock.json       what was translated from which text
 ```
 
+## 💬 What you can ask
+
+Wherever your app is today, one sentence gets it started.
+
+| Your app today | Just ask |
+|---|---|
+| 📝 Has strings, no translations yet | "Translate the app into French and German." |
+| 🌐 Already has some translations | "Set up localization." Existing translations are kept and checked |
+| 🧱 Text is written straight into the code | "Make this app localizable." The agent moves it into `strings.xml` or a String Catalog |
+| ➕ Adding a language later | "Add Japanese." |
+| ✏️ You changed some copy | "Update the translations." Only changed strings are redone |
+| 🧹 You deleted or renamed strings | "Clean up old translations." |
+| 👀 Ready to check the result | "Review the Arabic translations." |
+
+## 📦 Formats
+
+| Format | Status |
+|---|---|
+| Android `strings.xml` | ✅ Supported |
+| Apple String Catalog `.xcstrings` | ✅ Supported |
+| gettext `.po` / `.pot` | ✅ Supported |
+| Flutter ARB `.arb` | 🗓️ Planned |
+| JSON (flat, nested, i18next, ICU) | 🗓️ Planned |
+| Apple `.strings` / `.stringsdict` | 🗓️ Planned |
+| XLIFF `.xliff` | 🗓️ Planned |
+
+Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
+all supported.
+
 ## 🚀 Install
 
 Needs [Node.js](https://nodejs.org) 22 or newer.
@@ -156,35 +185,6 @@ Your agent picks these itself; you just ask. 👀 marks tools that only read and
 | `localship_translate` | Translates everything missing through a model API, for large apps |
 
 </details>
-
-## 💬 What you can ask
-
-Wherever your app is today, one sentence gets it started.
-
-| Your app today | Just ask |
-|---|---|
-| 📝 Has strings, no translations yet | "Translate the app into French and German." |
-| 🌐 Already has some translations | "Set up localization." Existing translations are kept and checked |
-| 🧱 Text is written straight into the code | "Make this app localizable." The agent moves it into `strings.xml` or a String Catalog |
-| ➕ Adding a language later | "Add Japanese." |
-| ✏️ You changed some copy | "Update the translations." Only changed strings are redone |
-| 🧹 You deleted or renamed strings | "Clean up old translations." |
-| 👀 Ready to check the result | "Review the Arabic translations." |
-
-## 📦 Formats
-
-| Format | Status |
-|---|---|
-| Android `strings.xml` | ✅ Supported |
-| Apple String Catalog `.xcstrings` | ✅ Supported |
-| gettext `.po` / `.pot` | ✅ Supported |
-| Flutter ARB `.arb` | 🗓️ Planned |
-| JSON (flat, nested, i18next, ICU) | 🗓️ Planned |
-| Apple `.strings` / `.stringsdict` | 🗓️ Planned |
-| XLIFF `.xliff` | 🗓️ Planned |
-
-Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
-all supported.
 
 ## ⌨️ From the command line
 
