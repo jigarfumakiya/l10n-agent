@@ -16,7 +16,7 @@ that need judgment: choosing what to set up, and writing the context translators
 
 - If `localship_*` MCP tools are available, use them (`localship_detect`, `localship_init`, …).
 - Otherwise run the CLI: `localship <command>`. If `localship` isn't installed, ask to install it once with
-  `npm install -g github:jigarfumakiya/localship` (running it through `npx` every time is slow).
+  `npm install -g localship` (running it through `npx` every time is slow).
 - Add `--json` when you need to read the output.
 
 Before writing anything, check `git status`. If there are uncommitted changes, mention it, so the

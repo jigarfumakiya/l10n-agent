@@ -11,7 +11,7 @@ is the part code can't check: meaning, tone, terminology, grammar and fit.
 ## Running the tool
 
 Use the `localship_*` MCP tools when available; otherwise the CLI `localship <command>`. If it isn't
-installed, ask to install it once with `npm install -g github:jigarfumakiya/localship`.
+installed, ask to install it once with `npm install -g localship`.
 
 ## Steps
 

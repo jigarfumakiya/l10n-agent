@@ -13,7 +13,7 @@ again unless something is genuinely blocked.
 
 Use the `localship_*` MCP tools when available. Otherwise the CLI: `localship plan`,
 `localship start`, `localship next-batch`, `localship submit` (install once with
-`npm install -g github:jigarfumakiya/localship` if it's missing).
+`npm install -g localship` if it's missing).
 
 ## 1. Plan (one tool call, one message)
 

@@ -155,16 +155,16 @@ Then open your app and ask: *"Translate this app into Hindi and Arabic."*
 Add Localship as an MCP server.
 
 ```json
-{ "mcpServers": { "localship": { "command": "npx", "args": ["-y", "github:jigarfumakiya/localship", "mcp"] } } }
+{ "mcpServers": { "localship": { "command": "npx", "args": ["-y", "localship", "mcp"] } } }
 ```
 
 | Tool | Where the config goes |
 |---|---|
-| Claude Code (without the plugin) | `claude mcp add localship -- npx -y github:jigarfumakiya/localship mcp` |
+| Claude Code (without the plugin) | `claude mcp add localship -- npx -y localship mcp` |
 | Cursor | `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` |
 | VS Code | `.vscode/mcp.json`, with `"servers"` instead of `"mcpServers"` and `"type": "stdio"` added |
 | Gemini CLI | `.gemini/settings.json` |
-| Codex | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "github:jigarfumakiya/localship", "mcp"]` |
+| Codex | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "localship", "mcp"]` |
 | Claude Desktop | `claude_desktop_config.json`, with `"-C", "/path/to/your/app"` added before `"mcp"` |
 
 The first start takes a minute while it installs.
@@ -209,6 +209,8 @@ Your agent picks these itself; you just ask. 👀 marks tools that only read and
 No agent needed: run Localship straight from your terminal with any model.
 
 ```sh
+npm install -g localship
+
 localship plan hindi arabic                                 # what it takes, before changing anything
 localship start hi,ar --model anthropic:claude-sonnet-5-5   # set up and translate in one go
 localship status                                            # progress per language

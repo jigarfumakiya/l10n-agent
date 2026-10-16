@@ -3,7 +3,7 @@
 //
 // A local checkout that has been built (`claude --plugin-dir <checkout>`) runs that build, so
 // changes can be tried without publishing. An installed plugin has no build, so it runs the
-// package from GitHub instead.
+// package from npm instead.
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -18,11 +18,10 @@ if (existsSync(local)) {
   await import(pathToFileURL(local).href);
 } else {
   const windows = process.platform === "win32";
-  const child = spawn(
-    windows ? "npx.cmd" : "npx",
-    ["-y", "github:jigarfumakiya/localship", "mcp", ...args],
-    { stdio: "inherit", shell: windows },
-  );
+  const child = spawn(windows ? "npx.cmd" : "npx", ["-y", "localship", "mcp", ...args], {
+    stdio: "inherit",
+    shell: windows,
+  });
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => child.kill(signal));
   child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
 }
