@@ -32,29 +32,28 @@ no server, no monthly bill.
 
 - 🆓 **Free and open source.** MIT-licensed. You pay only for your own AI usage, or nothing with a
   local model.
-- 🤖 **Works with the AI you already use.** Your coding agent's own model, or Claude, GPT, Gemini,
-  OpenRouter, or a local model through Ollama.
-- 🛡️ **Catches broken translations.** Placeholders, plural forms, Android escaping and markup are
-  checked in code before anything is written. Failures go back to the AI with the reason.
+- 🤖 **Your AI, your model.** Your coding agent's own model, or Claude, GPT, Gemini, OpenRouter
+  or Ollama.
+- 🛡️ **Catches broken translations.** Placeholders, plural forms, escaping and markup are checked
+  in code before anything is written. Failures go back to the AI with the reason.
 - 🧠 **More context for the AI.** Each string comes with the code that uses it, its comment, your
   glossary and voice notes, and earlier translations of the same text.
-- 🔒 **Stays in your repo.** No server, no account, no upload. Your files, written the way Android
-  Studio and Xcode write them.
+- 🔒 **Stays in your repo.** No server, no account, no upload. Your own translation files, formatted
+  the way your tools write them.
 - 💻 **Runs anywhere.** Claude Code, Cursor, VS Code, Codex, Gemini CLI, Claude Desktop or the
   terminal, on macOS, Linux and Windows.
 
 ### 🤔 Why use Localship?
 
-Your AI can already translate a strings file if you ask. Here's what changes with Localship:
-
 | | ❌ Asking an AI directly | ✅ With Localship |
 |---|---|---|
-| Placeholders like `%1$s` | Sometimes dropped, and the app crashes on that screen | Checked before writing; sent back to fix |
-| Plural forms | Arabic often gets 2 forms instead of 6 | The right forms for every language, from Unicode CLDR |
-| Android escaping | An unescaped apostrophe breaks the build | Escaped for you |
-| Consistent terms | "Budget" translated three ways | Glossary, voice notes and earlier translations |
-| Changing copy | Everything is translated again | Only changed strings are redone, with the old and new text |
-| Your translator's fixes | Overwritten | Kept unless you ask |
+| Context | One string at a time | Code, comments, brief and glossary |
+| Placeholders | Sometimes dropped | Checked before writing |
+| Plural forms | Often incomplete | Every form each language needs |
+| Escaping and markup | Can break the build | Checked and escaped |
+| Terms and tone | Drift across strings | Same glossary and voice everywhere |
+| Changed copy | Everything redone | Only what changed |
+| Your edits | Overwritten | Kept |
 
 ## 🎬 See it in action
 
