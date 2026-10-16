@@ -56,45 +56,19 @@ Your AI can already translate a strings file if you ask. Here's what changes wit
 
 ## 🎬 See it in action
 
-How a run goes on a small Android app, from the first request to approved translations. You talk
-to your coding agent as usual; Localship does the finding, checking and bookkeeping behind it.
-
-**1. Ask in plain words.** Localship looks at your repo and the agent comes back with one short
-plan, so nothing changes until you agree.
-
 ```
 You:    Translate this app into Hindi and Arabic.
-Agent:  Found 18 strings in app/src/main/res (2 plurals, 3 with placeholders).
-        • A short brief, voice notes and glossary go in .localship/, for you to edit
-        • "Jotter Pro" is kept as written
-        Say "start translating" to go.
-```
+Agent:  Found 18 strings (2 plurals, 3 with placeholders). I'll add a short brief and
+        glossary, and keep "Jotter Pro" as written. Say "start translating" to go.
 
-**2. Say "start translating".** The agent translates in small batches, each with the code that
-uses the string, its comment and your glossary. Every batch is checked before anything is
-written; a translation that fails goes back to the AI with the reason.
-
-```
 You:    Start translating.
-Agent:  36 translations written as drafts, 0 errors.
-        Arabic has all six plural forms, and every %1$s placeholder is in place.
-```
+Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural forms.
 
-**3. Review, then approve.** Drafts stay drafts until you say so.
+You:    Review the Arabic, then approve them.
+Agent:  Two small fixes made. All approved.
 
-```
-You:    Review the Arabic translations.
-Agent:  Two suggestions: … The rest read well. Approve them?
-You:    Approve them.
-```
-
-**4. Next time, only what changed.** Localship remembers what was translated from which text,
-and what you edited by hand.
-
-```
 You:    I reworded two buttons. Update the translations.
-Agent:  2 strings changed since they were translated, so I updated those in Hindi and Arabic.
-        Your hand edit to "sync_pro" in Hindi was kept.
+Agent:  Updated the 2 changed strings. Your hand edit in Hindi was kept.
 ```
 
 ## 🔍 How it works
@@ -147,10 +121,16 @@ Needs [Node.js](https://nodejs.org) 22 or newer.
 | Gemini CLI | `.gemini/settings.json` |
 | Codex | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "github:jigarfumakiya/localship", "mcp"]` |
 | Claude Desktop | `claude_desktop_config.json`, with `"-C", "/path/to/your/app"` added before `"mcp"` |
-| Terminal and CI | `npm install -g github:jigarfumakiya/localship` (see [Terminal and CI](#%EF%B8%8F-terminal-and-ci)) |
+| Command line | `npm install -g github:jigarfumakiya/localship` (see [From the command line](#%EF%B8%8F-from-the-command-line)) |
 
-Agents that read skills (Codex, Cursor, Gemini CLI…) also get step-by-step playbooks with
-`npx skills add jigarfumakiya/localship`. The first start takes a minute while it installs.
+The first start takes a minute while it installs.
+
+**Agent skills:** step-by-step playbooks for Codex, Cursor, Gemini CLI and other agents that read
+skills. One command:
+
+```sh
+npx skills add jigarfumakiya/localship
+```
 
 ## 💬 What you can ask
 
@@ -181,26 +161,16 @@ Wherever your app is today, one sentence gets it started.
 Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
 all supported.
 
-## ⌨️ Terminal and CI
+## ⌨️ From the command line
 
-Everything also works from the terminal, which is handy for big apps and CI:
+No agent needed: run Localship straight from your terminal with any model.
 
 ```sh
 localship plan hindi arabic                                 # what it takes, before changing anything
 localship start hi,ar --model anthropic:claude-sonnet-5-5   # set up and translate in one go
 localship status                                            # progress per language
-localship validate                                          # exits 1 on errors: use it in CI
+localship validate                                          # exits 1 on errors
 localship approve --locale hi                               # after review
-```
-
-To fail pull requests that break a placeholder or a plural form, add a step to your GitHub
-Actions workflow:
-
-```yaml
-- uses: actions/setup-node@v4
-  with:
-    node-version: 22
-- run: npx -y github:jigarfumakiya/localship validate
 ```
 
 Every command, option and config key is in the [reference](docs/reference.md).
@@ -284,8 +254,11 @@ Want something sooner? [Open an issue](https://github.com/jigarfumakiya/localshi
 
 ## 🤝 Contributing
 
-Contributions are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup and how the code is
-laid out.
+Found a bug or have an idea? [Open an issue](https://github.com/jigarfumakiya/localship/issues).
+
+## 👤 Author
+
+Made by [Jigar Fumakiya](https://github.com/jigarfumakiya).
 
 ## 📄 License
 
