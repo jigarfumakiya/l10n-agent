@@ -130,53 +130,44 @@ all supported.
 
 ## 🚀 Install
 
-Localship has three parts: an **MCP server** (the tools that read, check and write your
-translations), **agent skills** (the workflow your agent follows) and a **command line**. For the
-full setup, give your agent the server and the skills. Needs [Node.js](https://nodejs.org) 22 or
-newer.
-
-### ⭐ The easiest way
-
-**Claude Code:** install the plugin, which includes the server and the skills.
+**Claude Code plugin**
 
 ```
 /plugin marketplace add jigarfumakiya/localship
 /plugin install localship@localship
 ```
 
-**Cursor and VS Code:** add the server in one click, then add the skills.
+**Claude Code, Codex, Gemini CLI and other CLIs:** add the server, then the skills.
+
+```sh
+claude mcp add localship -- npx -y localship mcp   # Claude Code
+codex mcp add localship -- npx -y localship mcp    # Codex
+gemini mcp add localship npx -y localship mcp      # Gemini CLI
+npx skills add jigarfumakiya/localship             # the skills, for any agent
+```
+
+**Cursor and VS Code**
 
 [![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=localship&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsImxvY2Fsc2hpcCIsIm1jcCJdfQ%3D%3D)
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_server-0098FF?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect?url=vscode%3Amcp%2Finstall%3F%257B%2522name%2522%253A%2522localship%2522%252C%2522command%2522%253A%2522npx%2522%252C%2522args%2522%253A%255B%2522-y%2522%252C%2522localship%2522%252C%2522mcp%2522%255D%257D)
 
-```sh
-npx skills add jigarfumakiya/localship
-```
+Add the skills too: `npx skills add jigarfumakiya/localship`.
 
-**Codex, Gemini CLI and other agents:** add the server from [Other tools](#-other-tools) below,
-and the skills with the same command. Skills alone also work: your agent then uses the Localship
-command line and offers to install it the first time.
-
-Then open your app and ask: *"Translate this app into Hindi and Arabic."*
+Now ask your agent: *"Translate this app into Hindi and Arabic."* Needs Node.js 22 or newer.
 
 ### 🔌 Other tools
 
-Add Localship as an MCP server.
+Add this MCP server to your tool's config:
 
 ```json
 { "mcpServers": { "localship": { "command": "npx", "args": ["-y", "localship", "mcp"] } } }
 ```
 
-| Tool | Where the config goes |
+| Tool | Config file |
 |---|---|
-| Claude Code (without the plugin) | `claude mcp add localship -- npx -y localship mcp` |
-| Cursor | `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` |
-| VS Code | `.vscode/mcp.json`, with `"servers"` instead of `"mcpServers"` and `"type": "stdio"` added |
-| Gemini CLI | `.gemini/settings.json` |
-| Codex | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "localship", "mcp"]` |
-| Claude Desktop | `claude_desktop_config.json`, with `"-C", "/path/to/your/app"` added before `"mcp"` |
-
-The first start takes a minute while it installs.
+| Cursor | `.cursor/mcp.json` |
+| VS Code | `.vscode/mcp.json` (use `"servers"`) |
+| Claude Desktop | `claude_desktop_config.json` (add `"-C", "/path/to/app"` before `"mcp"`) |
 
 <details>
 <summary><b>MCP tools</b></summary>
