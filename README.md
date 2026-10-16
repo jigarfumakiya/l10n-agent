@@ -11,8 +11,6 @@ Free and open source · No account, no server · Any AI model · Every translati
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**[🚀 Get started in 30 seconds →](#-install)**
-
 [Highlights](#-highlights) · [See it in action](#-see-it-in-action) · [How it works](#-how-it-works) · [What you can ask](#-what-you-can-ask) · [Formats](#-formats) · [Install](#-install) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
 
 </div>
@@ -74,27 +72,6 @@ You:    I reworded two buttons. Update the translations.
 Agent:  Updated the 2 changed strings. Your hand edit in Hindi was kept.
 ```
 
-What lands in your files: English has two plural forms, and Arabic needs six. Localship asks for
-each one and checks they're all there before writing.
-
-```xml
-<!-- values/strings.xml -->
-<plurals name="notes_count">
-    <item quantity="one">%d note</item>
-    <item quantity="other">%d notes</item>
-</plurals>
-
-<!-- values-ar/strings.xml, written by Localship -->
-<plurals name="notes_count">
-    <item quantity="zero">لا توجد ملاحظات</item>
-    <item quantity="one">ملاحظة واحدة</item>
-    <item quantity="two">ملاحظتان</item>
-    <item quantity="few">%d ملاحظات</item>
-    <item quantity="many">%d ملاحظة</item>
-    <item quantity="other">%d ملاحظة</item>
-</plurals>
-```
-
 ## 🔍 How it works
 
 ```mermaid
@@ -154,6 +131,8 @@ all supported.
 
 Needs [Node.js](https://nodejs.org) 22 or newer.
 
+### ⭐ The easiest way
+
 **Claude Code:** install the plugin, which includes the server and the skills.
 
 ```
@@ -161,14 +140,19 @@ Needs [Node.js](https://nodejs.org) 22 or newer.
 /plugin install localship@localship
 ```
 
-**Agent skills:** step-by-step playbooks for Codex, Cursor, Gemini CLI and other agents that read
-skills. One command:
+**Codex, Cursor, Gemini CLI and other agents:** one command adds the Localship skills,
+step-by-step playbooks your agent follows. The first time, it offers to install the Localship
+command line it uses.
 
 ```sh
 npx skills add jigarfumakiya/localship
 ```
 
-**Other tools:** add Localship as an MCP server.
+Then open your app and ask: *"Translate this app into Hindi and Arabic."*
+
+### 🔌 Other tools
+
+Add Localship as an MCP server.
 
 ```json
 { "mcpServers": { "localship": { "command": "npx", "args": ["-y", "github:jigarfumakiya/localship", "mcp"] } } }
