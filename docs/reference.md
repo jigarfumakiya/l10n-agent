@@ -279,6 +279,11 @@ Errors are things that break the build or the app at runtime. Warnings are thing
 | `placeholder-not-positional` | warning | A source with several unnumbered placeholders should number them so translators can reorder |
 | `markup-mismatch`, `whitespace`, `untranslated`, `escape-unknown` | warning | Markup or edge whitespace changed, or text left in the source language (names the glossary keeps don't count) |
 | `glossary-keep`, `glossary-term` | warning | A kept name was changed, or a fixed term wasn't used |
+| `number-mismatch` | warning | A number in the source is missing from the translation. Digits in any script count ("१,३८५" is 1385); Arabic and Hebrew may write 1 and 2 as words |
+| `punctuation-end` | warning | The source ends with `?`, `!`, `:` or `…` and the translation doesn't, in any script's form (`؟`, `？`) |
+| `case-mismatch` | warning | An all-caps label isn't in capitals, in a script that has case. Names kept from the source don't count |
+| `token-missing` | warning | A link, email address or emoji from the source is missing or changed |
+| `inconsistent` | warning | The same source text is translated more than one way in a language, across all targets. Fine when the context differs; gettext contexts count as different |
 | `orphan`, `not-translatable` | warning | Leftover translations to clean up |
 | `plural-forms-unexpected`, `plural-forms-unknown`, `language-mismatch`, `source-language-mismatch` | warning | Header or config disagrees with the language or file |
 | `missing`, `locale-missing`, `variation-unsupported` | info | Untranslated strings and skipped content (errors with `--strict`) |

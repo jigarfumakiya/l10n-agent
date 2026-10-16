@@ -135,6 +135,44 @@ function buildMemory(project: Project, locales: string[]) {
   return memory;
 }
 
+/**
+ * A warning when the same source text already has a different translation in this language,
+ * so the agent can reuse it, or keep its own wording on purpose when the context differs.
+ */
+function differentWording(
+  target: Target,
+  src: Entry,
+  message: Message,
+  locale: string,
+  memory: ReturnType<typeof buildMemory>,
+  thisBatch: Map<string, { key: string; value: string }>,
+): Found | undefined {
+  // gettext contexts exist to let the same text translate differently.
+  if (message.kind !== "text" || src.context) return undefined;
+  const source = normalize(plainText(target, src));
+  if (!source) return undefined;
+  const value = normalize(message.value);
+  const id = `${locale}\u0000${source}`;
+  const earlier = thisBatch.get(id);
+  thisBatch.set(id, earlier ?? { key: displayKey(src.key), value });
+  // What the project already uses wins over what this batch chose first.
+  const existing = (memory.get(source) ?? [])
+    .filter(
+      (m) =>
+        m.locale === locale &&
+        (m.target !== target.id || m.key !== src.key) &&
+        typeof m.value === "string",
+    )
+    .map((m) => ({ key: displayKey(m.key), value: normalize(m.value as string) }))[0];
+  const other = existing ?? earlier;
+  if (!other || other.value === value) return undefined;
+  return {
+    severity: "warning",
+    code: "inconsistent",
+    message: `"${source}" is already translated as "${other.value}" (${other.key}). Use the same wording unless the context differs`,
+  };
+}
+
 /** The next entries needing translation, with everything a translator needs to do them well. */
 export async function nextBatch(project: Project, opts: BatchOptions = {}): Promise<Batch> {
   const usages = opts.usages === undefined ? await buildUsageIndex(project) : opts.usages;
@@ -346,6 +384,9 @@ export async function submit(
   const configured = projectLocales(project);
   const pending = new Map<Target, Map<string, Map<string, Entry>>>();
   const seen = new Set<string>();
+  // Translations already in the project, and ones accepted earlier in this batch, by source text.
+  const memory = buildMemory(project, configured);
+  const thisBatch = new Map<string, { key: string; value: string }>();
 
   for (const sub of submissions) {
     const reject = (message: string, code = "rejected", target?: string) =>
@@ -434,6 +475,8 @@ export async function submit(
       result.rejected.push({ target: target.id, locale, key: displayKey(src.key), errors });
       continue;
     }
+    const differs = differentWording(target, src, message, locale, memory, thisBatch);
+    if (differs) findings.push(differs);
     result.accepted.push({
       target: target.id,
       locale,

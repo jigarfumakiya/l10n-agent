@@ -9,6 +9,7 @@ import {
   type ValueAnalysis,
 } from "./model.js";
 import { type Project, projectLocales } from "./project.js";
+import { inconsistencies, textChecks } from "./qa.js";
 
 export interface ValidateOptions {
   locales?: string[];
@@ -116,6 +117,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
       }
     }
   }
+  issues.push(...inconsistencies(project, locales));
   return issues;
 }
 
@@ -405,6 +407,9 @@ export function compareValues(
   }
   if (opts.glossary?.length && opts.locale && t.text.trim() !== "") {
     out.push(...checkGlossary(opts.glossary, opts.locale, s.text, t.text));
+  }
+  if (t.text.trim() !== "") {
+    out.push(...textChecks(s, t, { countImplied: opts.countImplied, locale: opts.locale }));
   }
   const edge = (x: string) => [/^\s*/.exec(x)?.[0] ?? "", /\s*$/.exec(x)?.[0] ?? ""];
   const [sl, st] = edge(s.text);

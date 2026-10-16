@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- New checks: numbers that went missing, a lost closing `?`, `!`, `:` or `…`, all-caps labels not
+  in capitals, and links, emails or emoji that changed.
+- Consistency: the same text translated different ways in a language is flagged by `validate`,
+  across all targets, and `submit` warns the agent while it translates.
+
 ## 0.1.0
 
 The first release.
