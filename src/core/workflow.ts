@@ -6,6 +6,7 @@ import { hashMessage } from "./hash.js";
 import { getLockEntry, type Lockfile, type StoredState, setLockEntry, writeLock } from "./lock.js";
 import { displayKey, type Entry, type Message, messageValues } from "./model.js";
 import { findTarget, type Project, projectLocales, reopenProject } from "./project.js";
+import { roleOf, type UiRole } from "./qa.js";
 import { type EntryState, editedByHand, entryState } from "./status.js";
 import { buildUsageIndex, type Usage, type UsageIndex } from "./usage.js";
 import { checkTranslation, type Found } from "./validate.js";
@@ -27,6 +28,10 @@ export interface BatchItem {
   references?: string[];
   /** Code that uses the string: the file says which screen, the code what role it plays. */
   usage?: Usage[];
+  /** Where the string appears, read from that code. Buttons, tabs and chips have little room. */
+  role?: UiRole;
+  /** The translator's note on how they read an ambiguous source. */
+  note?: string;
   /** The translation on disk now, for stale or untracked entries. */
   current?: MessageValue;
   /** For stale entries: the source text `current` was translated from, when the lockfile knows it. */
@@ -206,6 +211,8 @@ export async function nextBatch(project: Project, opts: BatchOptions = {}): Prom
         if (matched <= offset || items.length >= limit) continue;
 
         const text = plainText(target, src);
+        const found = usages ? usages.find(target, src) : [];
+        const role = roleOf(found);
         const placeholders = [
           ...new Set(
             messageValues(src.message).flatMap(([, v]) =>
@@ -226,7 +233,9 @@ export async function nextBatch(project: Project, opts: BatchOptions = {}): Prom
           source: toValue(src.message),
           ...(src.comment ? { comment: src.comment } : {}),
           ...(src.context ? { context: src.context } : {}),
-          ...usageFields(usages ? usages.find(target, src) : [], src.references),
+          ...usageFields(found, src.references),
+          ...(role ? { role } : {}),
+          ...(tgt && lockEntry?.note ? { note: lockEntry.note } : {}),
           ...(tgt ? { current: toValue(tgt.message) } : {}),
           ...(state === "stale" && lockEntry?.sourceText !== undefined
             ? { previousSource: lockEntry.sourceText }
@@ -313,6 +322,8 @@ export interface Submission {
   key: string;
   /** A string for text, an object of plural forms, or an array for string arrays. */
   value: MessageValue;
+  /** How you read an ambiguous source ("Open" as a button, not a status), shown at review. */
+  note?: string;
 }
 
 export const MessageValueSchema = z.union([
@@ -326,6 +337,7 @@ export const SubmissionSchema = z.object({
   locale: z.string(),
   key: z.string(),
   value: MessageValueSchema,
+  note: z.string().optional(),
 });
 
 /** What `submit` reads: a list of translations, or `{ translations, model? }`. */
@@ -366,6 +378,8 @@ export interface SubmitOptions {
   /** Replace translations a person wrote, reviewed or approved. */
   force?: boolean;
   dryRun?: boolean;
+  /** Where strings are used in code; found when not given, `false` to skip. */
+  usages?: UsageIndex | false;
 }
 
 /** States `submit` may overwrite without `force`. */
@@ -387,6 +401,8 @@ export async function submit(
   // Translations already in the project, and ones accepted earlier in this batch, by source text.
   const memory = buildMemory(project, configured);
   const thisBatch = new Map<string, { key: string; value: string }>();
+  const usages = opts.usages === undefined ? await buildUsageIndex(project) : opts.usages;
+  const notes = new Map<string, string | null>();
 
   for (const sub of submissions) {
     const reject = (message: string, code = "rejected", target?: string) =>
@@ -467,6 +483,7 @@ export async function submit(
         locale,
         sourceLocale: project.config.sourceLocale,
         glossary: project.context.glossary,
+        role: usages ? roleOf(usages.find(target, src)) : undefined,
       }).filter((f) => f.code !== "plural-missing-category" && f.code !== "plural-extra-category"),
       ...checkPluralForms(target, locale, message),
     ];
@@ -488,6 +505,7 @@ export async function submit(
     entries.set(src.key, tgt);
     byLocale.set(locale, entries);
     pending.set(target, byLocale);
+    notes.set(id, sub.note?.trim() || null);
   }
 
   if (opts.dryRun || pending.size === 0) return result;
@@ -503,7 +521,12 @@ export async function submit(
 
   const keys = [...pending].flatMap(([target, byLocale]) =>
     [...byLocale].flatMap(([locale, entries]) =>
-      [...entries.keys()].map((key) => ({ target: target.id, locale, key })),
+      [...entries.keys()].map((key) => ({
+        target: target.id,
+        locale,
+        key,
+        note: notes.get(`${target.id}\u0000${locale}\u0000${key}`) ?? null,
+      })),
     ),
   );
   await record(project, keys, () => ({
@@ -608,7 +631,8 @@ function checkPluralForms(target: Target, locale: string, message: Message): Fou
  */
 async function record(
   project: Project,
-  keys: Array<{ target: string; locale: string; key: string }>,
+  /** `note`: the translator's note for a new translation, `null` to drop the old one. */
+  keys: Array<{ target: string; locale: string; key: string; note?: string | null }>,
   entry: (previous: { model?: string } | undefined) => { state: StoredState; model?: string },
 ): Promise<void> {
   const fresh = await reopenProject(project);
@@ -619,11 +643,14 @@ async function record(
     const tgt = target?.locales.get(k.locale)?.entries.get(k.key);
     if (!src || !tgt) continue;
     const previous = getLockEntry(lock, k.target, k.locale, k.key);
+    // A note belongs to a translation: kept while it stays, replaced with a new one.
+    const note = k.note === undefined ? previous?.note : (k.note ?? undefined);
     setLockEntry(lock, k.target, k.locale, k.key, {
       source: hashMessage(src.message),
       sourceText: toValue(src.message),
       target: hashMessage(tgt.message),
       ...entry(previous),
+      ...(note ? { note } : {}),
     });
   }
   pruneLock(fresh, lock);

@@ -9,12 +9,15 @@ import {
   type ValueAnalysis,
 } from "./model.js";
 import { type Project, projectLocales } from "./project.js";
-import { inconsistencies, textChecks } from "./qa.js";
+import { inconsistencies, lengthCheck, roleOf, textChecks, type UiRole } from "./qa.js";
+import type { UsageIndex } from "./usage.js";
 
 export interface ValidateOptions {
   locales?: string[];
   /** Treat untranslated strings and missing locales as errors. */
   strict?: boolean;
+  /** Where strings are used in code, so a string's role (button, tab…) can be checked. */
+  usages?: UsageIndex;
 }
 
 /** Deterministic checks for every target, its source strings and each locale. */
@@ -112,6 +115,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
             locale,
             sourceLocale: project.config.sourceLocale,
             glossary: project.context.glossary,
+            role: opts.usages ? roleOf(opts.usages.find(loaded, src)) : undefined,
           }).map((i) => ({ ...where, ...i })),
         );
       }
@@ -164,7 +168,7 @@ export function checkTranslation(
   spec: PluralSpec | undefined,
   src: Entry,
   tgt: Entry,
-  opts: { locale: string; sourceLocale: string; glossary?: GlossaryTerm[] },
+  opts: { locale: string; sourceLocale: string; glossary?: GlossaryTerm[]; role?: UiRole },
 ): Found[] {
   const { locale, sourceLocale } = opts;
   const t = tgt.message;
@@ -198,6 +202,7 @@ export function checkTranslation(
       strictNewlines: target.strictNewlines,
       glossary: opts.glossary,
       locale,
+      role: opts.role,
     }).map((f) => (form ? { ...f, form } : f));
 
   if (s.kind === "text" && t.kind === "text") return compare(s.value, t.value);
@@ -322,6 +327,7 @@ export function compareValues(
     strictNewlines?: boolean;
     glossary?: GlossaryTerm[];
     locale?: string;
+    role?: UiRole;
   } = {},
 ): Found[] {
   const out: Found[] = [...t.lints];
@@ -410,6 +416,8 @@ export function compareValues(
   }
   if (t.text.trim() !== "") {
     out.push(...textChecks(s, t, { countImplied: opts.countImplied, locale: opts.locale }));
+    const long = lengthCheck(opts.role, s, t);
+    if (long) out.push(long);
   }
   const edge = (x: string) => [/^\s*/.exec(x)?.[0] ?? "", /\s*$/.exec(x)?.[0] ?? ""];
   const [sl, st] = edge(s.text);

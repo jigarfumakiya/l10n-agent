@@ -173,7 +173,7 @@ export function inconsistencies(project: Project, locales: string[]): Issue[] {
       for (const src of target.source.entries.values()) {
         if (!src.translatable || src.message.kind !== "text") continue;
         const tgt = catalog.entries.get(src.key);
-        if (!tgt || tgt.message.kind !== "text") continue;
+        if (tgt?.message.kind !== "text") continue;
         const source = normalize(target.analyze(src.message.value, src).text);
         // gettext contexts (msgctxt) exist to let the same text translate differently.
         const group = `${src.context ?? ""}\u0004${source}`;
@@ -214,3 +214,79 @@ export function inconsistencies(project: Project, locales: string[]): Issue[] {
 
 const normalize = (text: string) => text.trim().replace(/\s+/g, " ");
 const short = (text: string) => (text.length > 40 ? `${text.slice(0, 39)}…` : text);
+
+/** Where a string appears, read from the code that uses it. */
+export type UiRole =
+  | "button"
+  | "tab"
+  | "chip"
+  | "menu item"
+  | "app name"
+  | "title"
+  | "toast"
+  | "notification"
+  | "placeholder"
+  | "accessibility label";
+
+/** Most specific first: an icon button's `contentDescription` is an accessibility label. */
+const ROLES: Array<[UiRole, RegExp]> = [
+  ["accessibility label", /contentDescription|accessibility(?:Label|Hint)/],
+  ["placeholder", /\bplaceholder\b|android:hint|\bhint\s*=|\b(?:Secure)?TextField\(/],
+  // Design systems wrap these (`AppButton`, `SmChip`), so any name ending in the kind counts.
+  ["tab", /\b\w*Tab\s*\(|Navigation(?:Bar|Rail)Item|BottomNavigationItem|\.tabItem\b/],
+  ["chip", /\b\w*Chip\s*\(/],
+  [
+    "button",
+    /\b\w*Button\s*[({]|<(?:\w+\.)*\w*Button\b|(?:confirm|dismiss)Button|set(?:Positive|Negative|Neutral)Button/,
+  ],
+  ["menu item", /DropdownMenuItem|<item\b[^>]*android:title|\bMenu\s*\{/],
+  ["toast", /Toast\.makeText|showSnackbar|Snackbar(?:\.make)?\(/],
+  ["notification", /setContent(?:Title|Text)|NotificationCompat|UNMutableNotificationContent/],
+  ["app name", /android:label=/],
+  ["title", /TopAppBar|\btitle\s*=|\.navigationTitle\(|setTitle\(|\.alert\(/],
+];
+
+/** The role most of a string's usages agree on. */
+export function roleOf(usages: Array<{ code: string }>): UiRole | undefined {
+  const counts = new Map<UiRole, number>();
+  for (const u of usages) {
+    // The line with the string decides; the line before it only when that line says nothing.
+    const lines = u.code.split("\n").reverse();
+    const role = lines
+      .map((line) => ROLES.find(([, pattern]) => pattern.test(line))?.[0])
+      .find((r) => r !== undefined);
+    if (role) counts.set(role, (counts.get(role) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
+/** Roles with a fixed amount of room, where a much longer translation gets cut off or wraps. */
+const TIGHT = new Set<UiRole>(["button", "tab", "chip", "menu item", "app name"]);
+
+/** A translation much wider than its source, in a place with little room. */
+export function lengthCheck(
+  role: UiRole | undefined,
+  s: ValueAnalysis,
+  t: ValueAnalysis,
+): Found | undefined {
+  if (!role || !TIGHT.has(role)) return undefined;
+  const source = width(visible(s).trim());
+  const target = width(visible(t).trim());
+  // Widths are estimates (Arabic letters join and run narrow), so only a clear overflow counts.
+  if (source === 0 || target <= source * 2 || target - source < 6) return undefined;
+  return {
+    severity: "warning",
+    code: "too-long",
+    message: `Used as a ${role}: about ${target} characters wide against ${source} in the source, so it may not fit`,
+  };
+}
+
+/** How wide text reads: combining marks take no room, Chinese, Japanese and Korean take two. */
+function width(text: string): number {
+  let w = 0;
+  for (const c of text) {
+    if (/\p{M}|​|‌|‍/u.test(c)) continue;
+    w += /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]|\p{Extended_Pictographic}/u.test(c) ? 2 : 1;
+  }
+  return w;
+}

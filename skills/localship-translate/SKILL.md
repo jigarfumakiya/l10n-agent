@@ -64,7 +64,11 @@ come out generic.
      one).
    - Arrays: same number of items, same order.
    - Reuse `memory` unless the context differs. Follow the glossary.
-   - Keep it about as long as the source; buttons and tabs have little room.
+   - Keep it about as long as the source. Items with a `role` of button, tab, chip or menu item
+     have little room: prefer the shortest natural wording.
+   - When the source could mean two things ("Open" as a button or a status, "Balance" as money
+     or equilibrium) and the context doesn't settle it, add a short `note` saying how you read
+     it. Reviewers see it. Skip notes when the meaning is clear.
    - Android values: write plain text; apostrophes, quotes and `&` are escaped for you.
 
 3. Submit, using a file for anything non-trivial:
@@ -77,7 +81,8 @@ come out generic.
      {"target": "android", "locale": "hi", "key": "days_left", "value": {"one": "%d दिन बाकी", "other": "%d दिन बाकी"}}
    ]}
    ```
-   Copy `target`, `locale` and `key` from the batch items. Delete the file afterwards.
+   Copy `target`, `locale` and `key` from the batch items. Add `"note"` to an entry only for an
+   ambiguous source. Delete the file afterwards.
 
 4. Read the result. Rejected entries list their errors: fix exactly those and resubmit only
    them. Accepted entries may have warnings (glossary, untranslated, whitespace): fix the

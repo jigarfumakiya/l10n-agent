@@ -7,6 +7,7 @@ import { nodeFs } from "../core/fs.js";
 import { plan, start } from "../core/plan.js";
 import { openProject } from "../core/project.js";
 import { computeStatus, ENTRY_STATES, type EntryState, statusNotes } from "../core/status.js";
+import { buildUsageIndex } from "../core/usage.js";
 import { validateProject } from "../core/validate.js";
 import {
   approve,
@@ -99,7 +100,11 @@ program
   .option("--json", "machine-readable output")
   .action(async (opts: { locale?: string[]; strict?: boolean; json?: boolean }) => {
     const project = await openProject(nodeFs, globals());
-    const issues = validateProject(project, { locales: opts.locale, strict: opts.strict });
+    const issues = validateProject(project, {
+      locales: opts.locale,
+      strict: opts.strict,
+      usages: await buildUsageIndex(project),
+    });
     const errors = issues.filter((i) => i.severity === "error").length;
     if (opts.json) {
       console.log(JSON.stringify({ ok: errors === 0, issues }, null, 2));

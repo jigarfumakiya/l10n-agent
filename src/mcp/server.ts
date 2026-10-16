@@ -12,6 +12,7 @@ import { type FileSystem, nodeFs } from "../core/fs.js";
 import { plan, start } from "../core/plan.js";
 import { openProject } from "../core/project.js";
 import { computeStatus, ENTRY_STATES, statusNotes } from "../core/status.js";
+import { buildUsageIndex } from "../core/usage.js";
 import { validateProject } from "../core/validate.js";
 import {
   approve,
@@ -142,7 +143,8 @@ export function createServer(opts: ServerOptions): McpServer {
         .describe("Untranslated strings and missing locales are errors"),
     },
     async ({ cwd, locales, strict }) => {
-      const issues = validateProject(await project(cwd), { locales, strict });
+      const p = await project(cwd);
+      const issues = validateProject(p, { locales, strict, usages: await buildUsageIndex(p) });
       return { ok: !issues.some((i) => i.severity === "error"), issues };
     },
     { readOnlyHint: true },
@@ -254,7 +256,7 @@ ${TRANSLATION_RULES}`,
 
   tool(
     "localship_submit",
-    "Check translations and write the ones without errors as drafts. Rejected ones come back with the errors to fix; resubmit just those. value is a string, an object of plural forms, or an array, matching the item's kind.",
+    "Check translations and write the ones without errors as drafts. Rejected ones come back with the errors to fix; resubmit just those. value is a string, an object of plural forms, or an array, matching the item's kind. Add a short note only when the source is ambiguous, saying how you read it.",
     {
       cwd: cwdArg,
       translations: z.array(SubmissionSchema),

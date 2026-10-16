@@ -6,6 +6,11 @@
   in capitals, and links, emails or emoji that changed.
 - Consistency: the same text translated different ways in a language is flagged by `validate`,
   across all targets, and `submit` warns the agent while it translates.
+- Roles: each string's place in the UI (button, tab, title, toast…) is read from the code that
+  uses it and sent with the batch, and a translation that clearly won't fit a button, tab, chip
+  or menu item is flagged.
+- Notes: the agent can add a short note to a translation of an ambiguous string ("Open" as a
+  button), kept in the lockfile and shown at review.
 
 ## 0.1.0
 

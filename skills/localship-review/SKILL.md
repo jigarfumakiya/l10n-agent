@@ -23,7 +23,8 @@ installed, ask to install it once with `npm install -g localship`.
    localship next-batch --locale hi --states draft
    ```
    Each item shows `source` and the translation as `current`, with the comment, plural forms
-   and glossary. Read `.localship/brief.md` and the locale's voice first.
+   and glossary. A `note` says how the translator read an ambiguous source: check that reading
+   first, and mention it to the user if you're not sure. `role` says where it appears. Read `.localship/brief.md` and the locale's voice first.
    To review translations made before Localship, use `--states untracked`; for hand edits,
    `--states edited`. Fixing those replaces a person's work, so ask before resubmitting, and
    pass `--force` only then.

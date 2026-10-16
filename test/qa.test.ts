@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { memoryFs } from "../src/core/fs.js";
 import type { Placeholder, ValueAnalysis } from "../src/core/model.js";
 import { openProject } from "../src/core/project.js";
-import { textChecks } from "../src/core/qa.js";
+import { lengthCheck, roleOf, textChecks } from "../src/core/qa.js";
 import { validateProject } from "../src/core/validate.js";
-import { submit } from "../src/core/workflow.js";
+import { approve, nextBatch, submit } from "../src/core/workflow.js";
 
 const value = (text: string, placeholders: Placeholder[] = []): ValueAnalysis => ({
   text,
@@ -58,7 +58,7 @@ describe("text checks", () => {
   });
 });
 
-const res = (dir: string, strings: Record<string, string>) =>
+const res = (strings: Record<string, string>) =>
   `<resources>${Object.entries(strings)
     .map(([k, v]) => `<string name="${k}">${v}</string>`)
     .join("")}</resources>`;
@@ -66,7 +66,7 @@ const res = (dir: string, strings: Record<string, string>) =>
 describe("consistency", () => {
   const files = {
     "/p/localship.yaml": "locales: [hi]\ntargets:\n  - format: android-xml\n    path: res\n",
-    "/p/res/values/strings.xml": res("values", {
+    "/p/res/values/strings.xml": res({
       account_delete: "Delete account",
       accounts_delete: "Delete account",
       settings_delete: "Delete account",
@@ -77,7 +77,7 @@ describe("consistency", () => {
   it("flags the same text translated different ways, pointing at the odd one out", async () => {
     const fs = memoryFs({
       ...files,
-      "/p/res/values-hi/strings.xml": res("values-hi", {
+      "/p/res/values-hi/strings.xml": res({
         account_delete: "अकाउंट हटाएँ",
         accounts_delete: "खाता हटाएँ",
         settings_delete: "अकाउंट हटाएँ",
@@ -94,7 +94,7 @@ describe("consistency", () => {
   it("warns at submit time, against the project and the rest of the batch", async () => {
     const fs = memoryFs({
       ...files,
-      "/p/res/values-hi/strings.xml": res("values-hi", { account_delete: "अकाउंट हटाएँ" }),
+      "/p/res/values-hi/strings.xml": res({ account_delete: "अकाउंट हटाएँ" }),
     });
     const r = await submit(
       await openProject(fs, { cwd: "/p" }),
@@ -106,5 +106,78 @@ describe("consistency", () => {
     );
     const warned = r.accepted.filter((a) => a.warnings.some((w) => w.code === "inconsistent"));
     expect(warned.map((a) => a.key)).toEqual(["accounts_delete"]);
+  });
+});
+
+describe("roles and length", () => {
+  const role = (...code: string[]) => roleOf(code.map((c) => ({ code: c })));
+
+  it("reads a string's role from the code that uses it", () => {
+    expect(role("Button(onClick = save) { Text(stringResource(R.string.save)) }")).toBe("button");
+    expect(role("SmPrimaryButton(stringResource(R.string.limit_see_pro))")).toBe("button");
+    expect(role('Button("Save") { save() }')).toBe("button");
+    expect(
+      role(
+        "IconButton(onClick = close) {\nIcon(x, contentDescription = stringResource(R.string.close))",
+      ),
+    ).toBe("accessibility label");
+    expect(role('.navigationTitle("Settings")')).toBe("title");
+    expect(role("Toast.makeText(context, R.string.saved, Toast.LENGTH_SHORT)")).toBe("toast");
+    expect(role("val label = stringResource(R.string.save)")).toBeUndefined();
+  });
+
+  it("lets the line with the string decide over the line before it", () => {
+    expect(
+      role(
+        "confirmButton = { TextButton(onClick = ok) { Text(stringResource(R.string.ok)) } },\ntitle = { Text(stringResource(R.string.dialog_title)) },",
+      ),
+    ).toBe("title");
+  });
+
+  it("warns only when a translation clearly overflows a tight place", () => {
+    const check = (r: Parameters<typeof lengthCheck>[0], s: string, t: string) =>
+      lengthCheck(r, value(s), value(t))?.code;
+    expect(check("button", "Retry", "إعادة المحاولة")).toBe("too-long");
+    expect(check("tab", "Home", "الرئيسية")).toBeUndefined();
+    expect(check("button", "Save", "Speichern")).toBeUndefined();
+    expect(check("title", "Retry", "إعادة المحاولة")).toBeUndefined();
+    // Chinese and Japanese characters take two columns each.
+    expect(check("button", "Save", "保存设置并继续")).toBe("too-long");
+  });
+});
+
+describe("notes", () => {
+  it("keeps a translator's note with its translation, until the translation changes", async () => {
+    const fs = memoryFs({
+      "/p/localship.yaml": "locales: [de]\ntargets:\n  - format: android-xml\n    path: res\n",
+      "/p/res/values/strings.xml": res({ open: "Open" }),
+    });
+    const project = await openProject(fs, { cwd: "/p" });
+    await submit(
+      project,
+      [{ locale: "de", key: "open", value: "Öffnen", note: "A button, not a status" }],
+      {
+        usages: false,
+      },
+    );
+    const lock = () => JSON.parse(fs.files.get("/p/.localship/lock.json") ?? "{}");
+    expect(lock().targets.android.de.open.note).toBe("A button, not a status");
+
+    const reopened = await openProject(fs, { cwd: "/p" });
+    const batch = await nextBatch(reopened, { states: ["draft"], usages: false });
+    expect(batch.items[0]?.note).toBe("A button, not a status");
+
+    await approve(reopened, { locales: ["de"] });
+    expect(lock().targets.android.de.open.note).toBe("A button, not a status");
+
+    await submit(
+      await openProject(fs, { cwd: "/p" }),
+      [{ locale: "de", key: "open", value: "Offen" }],
+      {
+        force: true,
+        usages: false,
+      },
+    );
+    expect(lock().targets.android.de.open.note).toBeUndefined();
   });
 });

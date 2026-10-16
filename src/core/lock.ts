@@ -19,6 +19,8 @@ export interface LockEntry {
   model?: string;
   /** AI review score, 0–100. */
   score?: number;
+  /** The translator's note on how they read an ambiguous source, shown at review. */
+  note?: string;
 }
 
 export interface Lockfile {

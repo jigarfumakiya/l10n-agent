@@ -89,13 +89,17 @@ with what a translator needs:
 Items also carry `usage`: up to three places in the code that show the string, with the file and
 line and the code around it, so the model can tell a button from a title. It's found from
 `R.string.*` and `@string/*` (Android), Swift string literals matched to catalog keys,
-interpolations included (String Catalogs), and `#:` references (gettext). A stale item also
+interpolations included (String Catalogs), and `#:` references (gettext). From that code an
+item may also carry `role` (button, tab, chip, menu item, title, toast, notification,
+placeholder, accessibility label), so the model keeps buttons and tabs short. A stale item also
 carries `previousSource`, the text the old translation was made from, so only the change is
 retranslated.
 
 `submit` runs the same checks as `validate`. Translations with errors come back with the
 reasons and are not written. The agent fixes those and resubmits. Accepted ones become drafts,
-recorded in `.localship/lock.json` with the model that made them. Android apostrophes, quotes and `&`
+recorded in `.localship/lock.json` with the model that made them. An entry may add a short
+`note` saying how the agent read an ambiguous source ("Open" as a button); it's kept with the
+translation and shown when the drafts are reviewed. Android apostrophes, quotes and `&`
 are escaped for you. A finished example, translated into Hindi and Arabic this way, is in
 [examples/android-notes](../examples/android-notes).
 
@@ -284,6 +288,7 @@ Errors are things that break the build or the app at runtime. Warnings are thing
 | `case-mismatch` | warning | An all-caps label isn't in capitals, in a script that has case. Names kept from the source don't count |
 | `token-missing` | warning | A link, email address or emoji from the source is missing or changed |
 | `inconsistent` | warning | The same source text is translated more than one way in a language, across all targets. Fine when the context differs; gettext contexts count as different |
+| `too-long` | warning | A button, tab, chip, menu item or app name translated more than twice as wide as the source (at least 6 characters more). The role comes from the code that uses the string; Chinese, Japanese and Korean characters count double |
 | `orphan`, `not-translatable` | warning | Leftover translations to clean up |
 | `plural-forms-unexpected`, `plural-forms-unknown`, `language-mismatch`, `source-language-mismatch` | warning | Header or config disagrees with the language or file |
 | `missing`, `locale-missing`, `variation-unsupported` | info | Untranslated strings and skipped content (errors with `--strict`) |
