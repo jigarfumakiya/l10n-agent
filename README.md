@@ -276,7 +276,6 @@ to look for.
 | 📦 | Android, String Catalog and gettext formats | ✅ Done |
 | 🧠 | Translation with context, checks, review, approval and cleanup | ✅ Done |
 | 🤖 | MCP server, agent skills, Claude Code plugin | ✅ Done |
-| 📥 | npm package (`npx localship`) | 🚧 Next |
 | 🧩 | Flutter ARB and JSON (i18next, flat, nested) | 🗓️ Planned |
 | ✅ | GitHub Action that checks pull requests | 🗓️ Planned |
 | 🔎 | Tools that find hardcoded text in Kotlin and Swift | 🗓️ Planned |
