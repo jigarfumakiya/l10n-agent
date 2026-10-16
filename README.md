@@ -11,7 +11,7 @@ Free and open source · No account, no server · Any AI model · Every translati
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[Install](#-install) · [Use it](#-use-it) · [Formats](#-formats) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
+[Highlights](#-highlights) · [Use it](#-use-it) · [Install](#-install) · [Formats](#-formats) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
 
 </div>
 
@@ -26,36 +26,64 @@ remembers what's been done, so the next update only redoes what changed.
 > but expect rough edges, and please [open an issue](https://github.com/jigarfumakiya/localship/issues)
 > when you hit one.
 
-## ❌ Without Localship
+## ✨ Highlights
 
-Ask an AI to translate your `strings.xml` and it mostly works, until it doesn't:
+- 🆓 **Free and open source.** MIT-licensed. You pay only for your own AI usage, or nothing with a
+  local model.
+- 🤖 **Works with the AI you already use.** Your coding agent's own model, or Claude, GPT, Gemini,
+  OpenRouter, or a local model through Ollama.
+- 🛡️ **Catches broken translations.** Placeholders, plural forms, Android escaping and markup are
+  checked in code before anything is written. Failures go back to the AI with the reason.
+- 🧠 **More context for the AI.** Each string comes with the code that uses it, its comment, your
+  glossary and voice notes, and earlier translations of the same text.
+- 🔁 **Only redoes what changed.** It tracks what's new, what changed and what someone edited by
+  hand, so updates are quick.
+- ✋ **People stay in charge.** Translations land as drafts for review. Hand edits and approved
+  translations are never overwritten unless you ask.
+- 🔒 **Stays in your repo.** No server, no account, no upload. Your files, written the way Android
+  Studio and Xcode write them.
+- 💻 **Runs anywhere.** Claude Code, Cursor, VS Code, Codex, Gemini CLI, Claude Desktop or the
+  terminal, on macOS, Linux and Windows.
 
-- ❌ A `%1$s` goes missing and the app crashes on that screen
-- ❌ Arabic gets two plural forms instead of six
-- ❌ An apostrophe isn't escaped and the Android build breaks
-- ❌ "Budget" is translated three different ways across the app
-- ❌ Change one line of copy and everything is translated again, including your translator's fixes
+### 🤔 Why Localship?
 
-## ✅ With Localship
+Your AI can already translate a strings file if you ask. Here's what changes with Localship:
 
-- ✅ Placeholders, plural forms, escaping and markup are **checked in code** before anything is
-  written. Failures go back to the AI with the reason.
-- ✅ Each string comes with **context**: the code that uses it, its comment, your glossary, voice
-  notes and earlier translations.
-- ✅ It **remembers** what's new, what changed and what someone edited by hand. Updates only redo
-  what's needed.
-- ✅ Translations land as **drafts**. Hand edits and approved translations are never overwritten
-  unless you ask.
+| | ❌ Asking an AI directly | ✅ With Localship |
+|---|---|---|
+| Placeholders like `%1$s` | Sometimes dropped, and the app crashes on that screen | Checked before writing; sent back to fix |
+| Plural forms | Arabic often gets 2 forms instead of 6 | The right forms for every language, from Unicode CLDR |
+| Android escaping | An unescaped apostrophe breaks the build | Escaped for you |
+| Consistent terms | "Budget" translated three ways | Glossary, voice notes and earlier translations |
+| Changing copy | Everything is translated again | Only changed strings are redone, with the old and new text |
+| Your translator's fixes | Overwritten | Kept unless you ask |
 
-## 💸 Free, with the AI you already have
+## 💬 Use it
 
-| | |
+Once it's [installed](#-install), open your app's repo and ask in plain words. You get one short plan: what it found, what it will
+do, and the defaults it picked. Say "start translating" and it runs to the end, then review and
+approve.
+
+```
+You:    Translate this app into Hindi and Arabic.
+Agent:  Found 18 strings in app/src/main/res. Here's the plan: a short brief and glossary,
+        formal Hindi, "Jotter Pro" kept as written. Say "start translating" to go.
+You:    Start translating.
+Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural forms.
+You:    Review the Arabic, then approve them.
+```
+
+<sub>From the example app in [examples/android-notes](examples/android-notes).</sub>
+
+| Your app today | Just ask |
 |---|---|
-| 🆓 **Free and open source** | MIT-licensed. You pay only for your own AI usage, or nothing with a local model |
-| 🤖 **Any model** | Your coding agent's own model, or Claude, GPT, Gemini, OpenRouter, or Ollama |
-| 🔒 **Stays in your repo** | No server, no account, no upload. Your files, written the way Android Studio and Xcode write them |
-| 🧰 **Works where you work** | Claude Code, Cursor, VS Code, Codex, Gemini CLI, Claude Desktop, or the terminal |
-| 💻 **Any OS** | macOS, Linux and Windows |
+| 📝 Has strings, no translations yet | "Translate the app into French and German." |
+| 🌐 Already has some translations | "Set up localization." Existing translations are kept and checked |
+| 🧱 Text is written straight into the code | "Make this app localizable." The agent moves it into `strings.xml` or a String Catalog |
+| ➕ Adding a language later | "Add Japanese." |
+| ✏️ You changed some copy | "Update the translations." Only changed strings are redone |
+| 🧹 You deleted or renamed strings | "Clean up old translations." |
+| 👀 Ready to check the result | "Review the Arabic translations." |
 
 ## 🚀 Install
 
@@ -143,30 +171,20 @@ See [Without an agent](#%EF%B8%8F-without-an-agent).
 
 ⏱️ The first start takes a minute while it installs; after that it's quick.
 
-## 💬 Use it
+## 📦 Formats
 
-Open your app's repo and ask in plain words.
-
-```
-You:    Translate this app into Hindi and Arabic.
-Agent:  Found 18 strings in app/src/main/res. Here's the plan: a short brief and glossary,
-        formal Hindi, "Jotter Pro" kept as written. Say "start translating" to go.
-You:    Start translating.
-Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural forms.
-You:    Review the Arabic, then approve them.
-```
-
-<sub>From the example app in [examples/android-notes](examples/android-notes).</sub>
-
-| Your app today | Just ask |
+| Format | Status |
 |---|---|
-| 📝 Has strings, no translations yet | "Translate the app into French and German." |
-| 🌐 Already has some translations | "Set up localization." Existing translations are kept and checked |
-| 🧱 Text is written straight into the code | "Make this app localizable." The agent moves it into `strings.xml` or a String Catalog |
-| ➕ Adding a language later | "Add Japanese." |
-| ✏️ You changed some copy | "Update the translations." Only changed strings are redone |
-| 🧹 You deleted or renamed strings | "Clean up old translations." |
-| 👀 Ready to check the result | "Review the Arabic translations." |
+| Android `strings.xml` | ✅ Supported |
+| Apple String Catalog `.xcstrings` | ✅ Supported |
+| gettext `.po` / `.pot` | ✅ Supported |
+| Flutter ARB `.arb` | 🗓️ Planned |
+| JSON (flat, nested, i18next, ICU) | 🗓️ Planned |
+| Apple `.strings` / `.stringsdict` | 🗓️ Planned |
+| XLIFF `.xliff` | 🗓️ Planned |
+
+Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
+all supported.
 
 ## ⌨️ Without an agent
 
@@ -181,16 +199,6 @@ localship approve --locale hi                               # after review
 ```
 
 Every command, option and config key is in the [reference](docs/reference.md).
-
-## 📦 Formats
-
-| Format | Used by |
-|---|---|
-| Android `res/values*/strings.xml` | Android apps (Kotlin, Java, Compose): strings, arrays and plurals |
-| Apple String Catalog `.xcstrings` | iOS, iPadOS, macOS, watchOS and visionOS apps, with plural variations |
-| gettext `.po` / `.pot` | Django, WordPress, Python, PHP, C and Linux apps |
-
-Flutter, JSON and more are on the [roadmap](#%EF%B8%8F-roadmap).
 
 ## 🔍 How it works
 
@@ -220,9 +228,8 @@ translate from the terminal or CI, and a local model through Ollama needs none a
 <details>
 <summary><b>Why not just ask my agent to translate?</b></summary>
 
-For a handful of strings once, that's fine. Localship helps when you localize continuously, have
-plurals and placeholders, want the same terms and tone across hundreds of strings and both
-platforms, or don't want a cloud translation platform.
+For a handful of strings once, that's fine. Localship is for when you keep the app translated as
+it changes, and want the mistakes in [Why Localship?](#-why-localship) caught before they ship.
 </details>
 
 <details>
