@@ -1,15 +1,39 @@
 {
   "name": "localship",
-  "version": "0.0.0",
-  "description": "Local-first, agent-native localization for apps. Your repo is the translation system; your model is the translator.",
+  "version": "0.1.0",
+  "description": "Translate your app with the AI you already use. An MCP server, agent skills and CLI that check every translation before it's written. Android, Apple String Catalogs and gettext.",
+  "keywords": [
+    "localization",
+    "l10n",
+    "i18n",
+    "translation",
+    "android",
+    "ios",
+    "xcstrings",
+    "string-catalog",
+    "gettext",
+    "mcp",
+    "mcp-server",
+    "claude-code",
+    "agent-skills",
+    "ai"
+  ],
+  "homepage": "https://github.com/jigarfumakiya/localship#readme",
+  "bugs": {
+    "url": "https://github.com/jigarfumakiya/localship/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jigarfumakiya/localship.git"
+  },
   "license": "MIT",
+  "author": "Jigar Fumakiya (https://github.com/jigarfumakiya)",
   "type": "module",
   "bin": {
-    "localship": "./dist/cli.js",
-    "l10n": "./dist/cli.js"
+    "localship": "./dist/cli.js"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
     "skills"
   ],
   "engines": {
@@ -23,19 +47,9 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "check": "npm run typecheck && npm run lint && npm test",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run check"
   },
-  "keywords": [
-    "localization",
-    "l10n",
-    "i18n",
-    "android",
-    "ios",
-    "xcstrings",
-    "mcp",
-    "agent",
-    "skills"
-  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
     "commander": "^15.0.0",
