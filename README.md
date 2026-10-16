@@ -11,6 +11,8 @@ Free and open source · No account, no server · Any AI model · Every translati
 [![MCP](https://img.shields.io/badge/MCP-server-8A2BE2)](https://modelcontextprotocol.io)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+**[🚀 Get started in 30 seconds →](#-install)**
+
 [Highlights](#-highlights) · [See it in action](#-see-it-in-action) · [How it works](#-how-it-works) · [What you can ask](#-what-you-can-ask) · [Formats](#-formats) · [Install](#-install) · [Questions](#-questions) · [Roadmap](#%EF%B8%8F-roadmap) · [Reference](docs/reference.md)
 
 </div>
@@ -19,7 +21,8 @@ Free and open source · No account, no server · Any AI model · Every translati
 
 Ask your coding agent to translate your app. Localship gives it the context it needs, checks
 every translation before it's written, and remembers what's done, so updates only redo what
-changed.
+changed. Think of it as a localization platform that runs inside your coding agent: no account,
+no server, no monthly bill.
 
 > [!NOTE]
 > **Early days.** Localship is new. It's tested on real-world translation files and a real app,
@@ -69,6 +72,27 @@ Agent:  Two small fixes made. All approved.
 
 You:    I reworded two buttons. Update the translations.
 Agent:  Updated the 2 changed strings. Your hand edit in Hindi was kept.
+```
+
+What lands in your files: English has two plural forms, and Arabic needs six. Localship asks for
+each one and checks they're all there before writing.
+
+```xml
+<!-- values/strings.xml -->
+<plurals name="notes_count">
+    <item quantity="one">%d note</item>
+    <item quantity="other">%d notes</item>
+</plurals>
+
+<!-- values-ar/strings.xml, written by Localship -->
+<plurals name="notes_count">
+    <item quantity="zero">لا توجد ملاحظات</item>
+    <item quantity="one">ملاحظة واحدة</item>
+    <item quantity="two">ملاحظتان</item>
+    <item quantity="few">%d ملاحظات</item>
+    <item quantity="many">%d ملاحظة</item>
+    <item quantity="other">%d ملاحظة</item>
+</plurals>
 ```
 
 ## 🔍 How it works
@@ -185,6 +209,16 @@ Your agent picks these itself; you just ask. 👀 marks tools that only read and
 | `localship_translate` | Translates everything missing through a model API, for large apps |
 
 </details>
+
+## 🔒 Security and privacy
+
+- **Stays in your project.** Localship reads and writes only your translation files and the
+  `.localship/` folder. Changes to your code are made by your agent, where you can see them.
+- **No Localship server.** No account, no telemetry. The only calls Localship makes go to a model
+  API you set up, with your own key. With your coding agent's model or a local Ollama, it sends
+  nothing over the internet.
+- **Nothing is final until you say so.** Translations are written as drafts, and hand edits and
+  approved translations are never replaced unless you ask.
 
 ## ⌨️ From the command line
 
