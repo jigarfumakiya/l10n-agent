@@ -41,7 +41,7 @@ changed.
 - 💻 **Runs anywhere.** Claude Code, Cursor, VS Code, Codex, Gemini CLI, Claude Desktop or the
   terminal, on macOS, Linux and Windows.
 
-### 🤔 Why Localship?
+### 🤔 Why use Localship?
 
 Your AI can already translate a strings file if you ask. Here's what changes with Localship:
 
@@ -108,6 +108,13 @@ Needs [Node.js](https://nodejs.org) 22 or newer.
 /plugin install localship@localship
 ```
 
+**Agent skills:** step-by-step playbooks for Codex, Cursor, Gemini CLI and other agents that read
+skills. One command:
+
+```sh
+npx skills add jigarfumakiya/localship
+```
+
 **Other tools:** add Localship as an MCP server.
 
 ```json
@@ -116,21 +123,39 @@ Needs [Node.js](https://nodejs.org) 22 or newer.
 
 | Tool | Where the config goes |
 |---|---|
+| Claude Code (without the plugin) | `claude mcp add localship -- npx -y github:jigarfumakiya/localship mcp` |
 | Cursor | `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` |
 | VS Code | `.vscode/mcp.json`, with `"servers"` instead of `"mcpServers"` and `"type": "stdio"` added |
 | Gemini CLI | `.gemini/settings.json` |
 | Codex | `~/.codex/config.toml`: `[mcp_servers.localship]` with `command = "npx"` and `args = ["-y", "github:jigarfumakiya/localship", "mcp"]` |
 | Claude Desktop | `claude_desktop_config.json`, with `"-C", "/path/to/your/app"` added before `"mcp"` |
-| Command line | `npm install -g github:jigarfumakiya/localship` (see [From the command line](#%EF%B8%8F-from-the-command-line)) |
 
 The first start takes a minute while it installs.
 
-**Agent skills:** step-by-step playbooks for Codex, Cursor, Gemini CLI and other agents that read
-skills. One command:
+<details>
+<summary><b>MCP tools</b></summary>
 
-```sh
-npx skills add jigarfumakiya/localship
-```
+Your agent picks these itself; you just ask. 👀 marks tools that only read and never change a file.
+
+| Tool | What it does |
+|---|---|
+| `localship_plan` 👀 | Looks at the project and returns one plan for a request: what it found, blockers, steps and defaults |
+| `localship_start` | Sets up a confirmed plan: config, default voice notes and glossary, never overwriting yours |
+| `localship_status` 👀 | Progress per language: missing, changed, drafts, approved |
+| `localship_validate` 👀 | Checks placeholders, plural forms, escaping, markup and the glossary |
+| `localship_detect` 👀 | Finds translation files in the repo |
+| `localship_init` | Writes the config from what was detected |
+| `localship_add_locales` | Adds languages to translate into |
+| `localship_get_context` 👀 | Reads the brief, voice notes and glossary |
+| `localship_update_context` | Writes the brief, voice notes or glossary |
+| `localship_next_batch` 👀 | The next strings to translate, with their context |
+| `localship_submit` | Checks translations and writes the good ones as drafts |
+| `localship_approve` | Marks drafts reviewed or approved, when you say so |
+| `localship_remove` | Clears translations so they're redone; keeps your edits unless you ask |
+| `localship_prune` | Removes translations of deleted strings |
+| `localship_translate` | Translates everything missing through a model API, for large apps |
+
+</details>
 
 ## 💬 What you can ask
 
@@ -176,6 +201,15 @@ localship approve --locale hi                               # after review
 Every command, option and config key is in the [reference](docs/reference.md).
 
 ## ❓ Questions
+
+<details>
+<summary><b>The Localship tools don't show up. What do I check?</b></summary>
+
+- Node.js 22 or newer: run `node --version`.
+- The first start takes a minute while it installs; try again after that.
+- Reconnect the server: `/mcp` in Claude Code, or restart your editor.
+- Open your app's folder in your tool, so Localship starts in the right project.
+</details>
 
 <details>
 <summary><b>Can I try it before using it on my app?</b></summary>
@@ -255,11 +289,3 @@ Want something sooner? [Open an issue](https://github.com/jigarfumakiya/localshi
 ## 🤝 Contributing
 
 Found a bug or have an idea? [Open an issue](https://github.com/jigarfumakiya/localship/issues).
-
-## 👤 Author
-
-Made by [Jigar Fumakiya](https://github.com/jigarfumakiya).
-
-## 📄 License
-
-[MIT](LICENSE)
