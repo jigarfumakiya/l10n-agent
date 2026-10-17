@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Consistency: a translation with a note is worded differently on purpose ("Delete account" for
+  a sign-in account and for a budget), so `validate` and `submit` no longer flag it.
+
 ## 0.2.0
 
 - New checks: numbers that went missing, a lost closing `?`, `!`, `:` or `…`, all-caps labels not

@@ -151,9 +151,10 @@ function differentWording(
   locale: string,
   memory: ReturnType<typeof buildMemory>,
   thisBatch: Map<string, { key: string; value: string }>,
+  note: string | undefined,
 ): Found | undefined {
-  // gettext contexts exist to let the same text translate differently.
-  if (message.kind !== "text" || src.context) return undefined;
+  // gettext contexts exist to let the same text translate differently; a note says why it does.
+  if (message.kind !== "text" || src.context || note) return undefined;
   const source = normalize(plainText(target, src));
   if (!source) return undefined;
   const value = normalize(message.value);
@@ -174,7 +175,7 @@ function differentWording(
   return {
     severity: "warning",
     code: "inconsistent",
-    message: `"${source}" is already translated as "${other.value}" (${other.key}). Use the same wording unless the context differs`,
+    message: `"${source}" is already translated as "${other.value}" (${other.key}). Use the same wording, or add a note saying how the context differs`,
   };
 }
 
@@ -492,7 +493,15 @@ export async function submit(
       result.rejected.push({ target: target.id, locale, key: displayKey(src.key), errors });
       continue;
     }
-    const differs = differentWording(target, src, message, locale, memory, thisBatch);
+    const differs = differentWording(
+      target,
+      src,
+      message,
+      locale,
+      memory,
+      thisBatch,
+      sub.note?.trim(),
+    );
     if (differs) findings.push(differs);
     result.accepted.push({
       target: target.id,

@@ -69,6 +69,9 @@ come out generic.
    - When the source could mean two things ("Open" as a button or a status, "Balance" as money
      or equilibrium) and the context doesn't settle it, add a short `note` saying how you read
      it. Reviewers see it. Skip notes when the meaning is clear.
+   - Same source text, different meaning ("Delete account" for a sign-in account and for a
+     budget): translate each for its meaning and add a `note` saying how they differ, so the
+     consistency check doesn't flag it.
    - Android values: write plain text; apostrophes, quotes and `&` are escaped for you.
 
 3. Submit, using a file for anything non-trivial:
@@ -82,7 +85,7 @@ come out generic.
    ]}
    ```
    Copy `target`, `locale` and `key` from the batch items. Add `"note"` to an entry only for an
-   ambiguous source. Delete the file afterwards.
+   ambiguous source, or one worded differently on purpose. Delete the file afterwards.
 
 4. Read the result. Rejected entries list their errors: fix exactly those and resubmit only
    them. Accepted entries may have warnings (glossary, untranslated, whitespace): fix the

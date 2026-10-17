@@ -1,3 +1,4 @@
+import { getLockEntry } from "./lock.js";
 import { displayKey, type Entry, type Issue, type ValueAnalysis } from "./model.js";
 import type { Project } from "./project.js";
 import type { Found } from "./validate.js";
@@ -161,7 +162,8 @@ function matches(text: string, pattern: RegExp): string[] {
 /**
  * The same source text translated more than one way in a language, across every target (so an
  * iOS and an Android app are compared too). Often a slip; sometimes right, when the context
- * differs ("Open" as a button and as a status).
+ * differs ("Open" as a button and as a status). A translation with a note says why it differs,
+ * so it isn't counted.
  */
 export function inconsistencies(project: Project, locales: string[]): Issue[] {
   const out: Issue[] = [];
@@ -174,6 +176,7 @@ export function inconsistencies(project: Project, locales: string[]): Issue[] {
         if (!src.translatable || src.message.kind !== "text") continue;
         const tgt = catalog.entries.get(src.key);
         if (tgt?.message.kind !== "text") continue;
+        if (getLockEntry(project.lock, target.id, locale, src.key)?.note) continue;
         const source = normalize(target.analyze(src.message.value, src).text);
         // gettext contexts (msgctxt) exist to let the same text translate differently.
         const group = `${src.context ?? ""}\u0004${source}`;
@@ -201,7 +204,7 @@ export function inconsistencies(project: Project, locales: string[]): Issue[] {
       out.push({
         severity: "warning",
         code: "inconsistent",
-        message: `"${short(source)}" is translated ${ways.size} ways: ${listed}. Fine if the context differs`,
+        message: `"${short(source)}" is translated ${ways.size} ways: ${listed}. If the context differs, add a note to the translation saying how`,
         locale,
         ...(odd
           ? { target: odd.target, key: odd.entry.key, file: odd.entry.file, line: odd.entry.line }

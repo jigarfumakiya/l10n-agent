@@ -107,6 +107,24 @@ describe("consistency", () => {
     const warned = r.accepted.filter((a) => a.warnings.some((w) => w.code === "inconsistent"));
     expect(warned.map((a) => a.key)).toEqual(["accounts_delete"]);
   });
+
+  it("leaves out a translation whose note says why it's worded differently", async () => {
+    const fs = memoryFs({
+      ...files,
+      "/p/res/values-hi/strings.xml": res({ account_delete: "अकाउंट हटाएँ" }),
+    });
+    const note = "A budget book, not the sign-in account";
+    const r = await submit(
+      await openProject(fs, { cwd: "/p" }),
+      [{ locale: "hi", key: "accounts_delete", value: "खाता हटाएँ", note }],
+      { usages: false },
+    );
+    expect(r.accepted[0]?.warnings.map((w) => w.code)).not.toContain("inconsistent");
+    const found = validateProject(await openProject(fs, { cwd: "/p" })).filter(
+      (i) => i.code === "inconsistent",
+    );
+    expect(found).toEqual([]);
+  });
 });
 
 describe("roles and length", () => {

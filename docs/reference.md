@@ -287,7 +287,7 @@ Errors are things that break the build or the app at runtime. Warnings are thing
 | `punctuation-end` | warning | The source ends with `?`, `!`, `:` or `…` and the translation doesn't, in any script's form (`؟`, `？`) |
 | `case-mismatch` | warning | An all-caps label isn't in capitals, in a script that has case. Names kept from the source don't count |
 | `token-missing` | warning | A link, email address or emoji from the source is missing or changed |
-| `inconsistent` | warning | The same source text is translated more than one way in a language, across all targets. Fine when the context differs; gettext contexts count as different |
+| `inconsistent` | warning | The same source text is translated more than one way in a language, across all targets. Fine when the context differs; gettext contexts count as different, and a translation with a note is left out |
 | `too-long` | warning | A button, tab, chip, menu item or app name translated more than twice as wide as the source (at least 6 characters more). The role comes from the code that uses the string; Chinese, Japanese and Korean characters count double |
 | `orphan`, `not-translatable` | warning | Leftover translations to clean up |
 | `plural-forms-unexpected`, `plural-forms-unknown`, `language-mismatch`, `source-language-mismatch` | warning | Header or config disagrees with the language or file |
