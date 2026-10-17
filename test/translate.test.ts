@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { memoryFs } from "../src/core/fs.js";
 import { openProject } from "../src/core/project.js";
@@ -175,7 +176,8 @@ describe("translateProject", () => {
     const readFile = fs.readFile;
     let codeReads = 0;
     fs.readFile = async (file) => {
-      if (file === sourceFile) codeReads++;
+      // Compare by name: Windows passes the path back as \p\Main.kt.
+      if (path.basename(file) === "Main.kt") codeReads++;
       return readFile(file);
     };
     const r = await translateProject(await openProject(fs, { cwd: "/p" }), {

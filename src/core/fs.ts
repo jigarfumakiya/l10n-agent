@@ -21,6 +21,23 @@ function busy(file: string): UserError {
   );
 }
 
+/**
+ * Windows refuses to replace a file another process (or a concurrent write, an antivirus or
+ * indexer scan) has open, with EPERM, EACCES or EBUSY. It clears within moments, so retry briefly.
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fsp.rename(from, to);
+      return;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (attempt >= 20 || !(code === "EPERM" || code === "EACCES" || code === "EBUSY")) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 10 + attempt * 10));
+    }
+  }
+}
+
 export const nodeFs: FileSystem = {
   readFile: (file) => fsp.readFile(file, "utf8"),
   async writeFile(file, content) {
@@ -28,7 +45,7 @@ export const nodeFs: FileSystem = {
     const tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;
     try {
       await fsp.writeFile(tmp, content, { encoding: "utf8", flag: "wx" });
-      await fsp.rename(tmp, file);
+      await renameWithRetry(tmp, file);
     } finally {
       await fsp.rm(tmp, { force: true });
     }
