@@ -1,7 +1,7 @@
 {
   "name": "localship",
   "displayName": "Localship",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Translate Android, gettext and Apple String Catalog apps with your own model: skills to set up, translate and review, and an MCP server that checks every translation.",
   "author": {
     "name": "Jigar Fumakiya",

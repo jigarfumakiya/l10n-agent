@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - New checks: numbers that went missing, a lost closing `?`, `!`, `:` or `…`, all-caps labels not
   in capitals, and links, emails or emoji that changed.
