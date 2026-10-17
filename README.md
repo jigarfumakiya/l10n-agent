@@ -64,11 +64,9 @@ For a comparison with Lingo.dev, Crowdin, Lokalise and i18n Ally, see the
 
 ```
 You:    Translate this app into Hindi and Arabic.
-Agent:  Found 18 strings (2 plurals, 3 with placeholders). I'll add a short brief and
-        glossary, and keep "Jotter Pro" as written. Say "start translating" to go.
-
-You:    Start translating.
-Agent:  36 translations written as drafts, 0 errors. Arabic has all six plural forms.
+Agent:  Translating 18 strings into Hindi and Arabic…
+        36 translations written as drafts, 0 errors. Arabic has all six plural forms.
+        Hindi addresses the user as आप, and "Jotter Pro" is kept as written.
 
 You:    Review the Arabic, then approve them.
 Agent:  Two small fixes made. All approved.
@@ -186,8 +184,8 @@ Your agent picks these itself; you just ask. 👀 marks tools that only read and
 
 | Tool | What it does |
 |---|---|
-| `localship_plan` 👀 | Looks at the project and returns one plan for a request: what it found, blockers, steps and defaults |
-| `localship_start` | Sets up a confirmed plan: config, default voice notes and glossary, never overwriting yours |
+| `localship_plan` 👀 | Looks at what a request involves: files, strings to translate, anything in the way |
+| `localship_start` | Writes the config for the languages, or adds them to it |
 | `localship_status` 👀 | Progress per language: missing, changed, drafts, approved |
 | `localship_validate` 👀 | Checks placeholders, plural forms, escaping, markup and the glossary |
 | `localship_detect` 👀 | Finds translation files in the repo |

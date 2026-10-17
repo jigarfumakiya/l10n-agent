@@ -29,7 +29,6 @@ describe("other localization tools", () => {
     const p = await plan(fs(), "/r", { locales: ["hi"] });
     expect(p.ready).toBe(true);
     expect(p.warnings).toHaveLength(3);
-    expect(p.confirm).toBe("start translating");
   });
 
   it("stay quiet when there are none", async () => {

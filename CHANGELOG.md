@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Agents do what was asked and nothing more. `plan` is now a read-only look with no confirm
+  phrase; agents stop only for blockers or another tool managing translations. Text still in
+  the code is a note, not a blocker: it's moved only when the user asks. No branches, commits,
+  or brief, voice and glossary files unless asked; `start` writes only the config. The model API
+  (`translate --model`) is used only when the user asks for it.
+- Batches carry `defaultVoice`, the usual formality for a language with no voice file, and keep
+  the Android app name as written when the glossary doesn't mention it, without writing either
+  to a file. European Portuguese no longer gets Brazilian conventions.
+
 - Add model request deadlines and cancellation through the CLI and MCP, including response-body
   reads and retry waits. Bound complete prompts by UTF-8 size, including context and retry feedback.
 - Coordinate submit/approve/remove/prune writes across processes and reload inside the project

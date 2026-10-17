@@ -9,8 +9,8 @@ Localship keeps translations in the repo's own files (Android `res/values-*/stri
 gettext `.po`, Apple `.xcstrings`) and checks every translation in code. You do the parts
 that need judgment: choosing what to set up, and writing the context translators use.
 
-> For a direct request ("translate this app to Hindi"), start with the `localship` skill: it
-> plans once, asks for one confirmation, and then uses this playbook without more questions.
+> For a direct request ("translate this app to Hindi"), start with the `localship` skill instead:
+> it sets up only the config and translates.
 
 ## Running the tool
 
@@ -30,20 +30,19 @@ pick the case that fits:
 
 | What detect shows | Case |
 |---|---|
-| A warning that most of the app's text is still in the code (more UI text in code than strings in resources) | **C. Text is hardcoded**, even if a few strings exist: run `localship-extract` first, or translations will cover only part of the app. Tell the user how much is in code |
+| A warning that most of the app's text is still in the code (more UI text in code than strings in resources) | **C. Text is hardcoded**, even if a few strings exist: tell the user how much is in code; translations cover only what's in resources until it's moved (the `localship-extract` skill, if they ask) |
 | Setups with existing languages (`hi, ar` …) | **A. Already localized** |
 | Setups with strings but no languages | **B. Ready to translate** |
 | An empty String Catalog (0 strings) | Check compiler extraction and target membership; build relevant targets and platforms, then detect again |
 | A gettext template with no translations | **B**, after confirming where new `.po` files go (detect suggests a path) |
-| Nothing, with a hint about Android or Xcode | **C. Text is hardcoded**: run the `localship-extract` skill first, then come back |
+| Nothing, with a hint about Android or Xcode | **C. Text is hardcoded**: nothing to set up until the text is in resources; the `localship-extract` skill moves it, if the user asks |
 | Only formats listed as "not supported yet" (Flutter ARB, JSON, `.strings` …) | Say so plainly; Localship can't translate those yet |
 
-## 2. Ask, then init
+## 2. Init
 
-Show the user what was found and ask:
-- which setups to include (skip debug, test and sample folders unless they want them);
-- **case A:** whether to keep translating the languages already there, and whether to add more;
-- **case B:** which languages to translate into. Suggest from their market if they don't know.
+Include every setup detect found except debug, test and sample folders, unless the user said
+otherwise. Languages: the ones the user named, plus (case A) the ones already there. If the user
+named none and there are none, ask which; that's the one thing setup can't guess.
 
 Then run `localship init --accept <numbers> --locales <list>` (add `--source <locale>` if the detected
 source language is wrong). Language codes are BCP 47 (`hi`, `ar`, `pt-BR`, `zh-Hans`). Never pass
@@ -51,12 +50,11 @@ source language is wrong). Language codes are BCP 47 (`hi`, `ar`, `pt-BR`, `zh-H
 
 ## 3. Existing translations (case A)
 
-They show as `untracked`: made before Localship, so the tool doesn't know if they're good. Ask:
-- **Trust them:** `localship approve --from untracked`.
-- **Review first:** run the `localship-review` skill on them (it can fetch untracked strings).
-- **Leave them:** they stay as they are and are never overwritten without the user's say-so.
-Then `localship validate`: existing files often have real problems (missing placeholders, broken
-plurals). Report the errors and offer to fix them.
+They show as `untracked`: made before Localship, so the tool doesn't know if they're good. Leave
+them as they are; they're never overwritten without the user's say-so. In your report, mention
+that the user can approve them (`localship approve --from untracked`) or have them reviewed (the
+`localship-review` skill). Run `localship validate`: existing files often have real problems
+(missing placeholders, broken plurals). Report the errors; fix them if the user asks.
 
 ## 4. Platform setup the tool can't do (mention what applies)
 
@@ -83,24 +81,26 @@ strict validation blocks them even when supported strings are all complete.
 
 ## 5. Write the context
 
-Create these in `.localship/` (the `context` folder in the config). Draft them from the README, store
-listing, website copy and the strings themselves, then show the user and adjust.
+The user asked for setup, so write these in `.localship/` (the `context` folder in the config).
+Draft them from the README, store listing, website copy and the strings themselves, and show the
+user what you wrote. Don't overwrite files that already exist.
 
 - `brief.md`: what the app does, who uses it, the tone of its copy (calm, playful, formal…), and
-  anything translators get wrong without context (e.g. "a 'budget' is a monthly spending plan,
-  not a cheap option"). Half a page at most.
+  anything translators get wrong without context (e.g. "a 'notebook' is a group of notes, not
+  a paper notebook"). Half a page at most.
 - `voice/all.md`: voice rules for every language. `voice/<locale>.md`: per language, e.g. formality
-  (German du vs Sie, Hindi तुम vs आप), English loanwords, number and date conventions. Ask the user
-  their preference for formality; don't guess silently.
+  (German du vs Sie, Hindi तुम vs आप), English loanwords, number and date conventions. Use what the
+  user said; otherwise the usual convention for consumer apps in that language, and name the choice
+  in your summary so they can change it.
 - `glossary.yaml`: brand and product names to keep (`translate: false`), and product terms that
   must be translated consistently:
   ```yaml
   terms:
-    - term: StillMoney
+    - term: Jotter
       translate: false
-    - term: safe to spend
-      note: The amount the user can spend today without breaking their budget
-      translations: { hi: खर्च के लिए सुरक्षित }
+    - term: notebook
+      note: A named group of notes, not a paper notebook
+      translations: { hi: नोटबुक }
   ```
   Keep it short: names, and terms that appear in many strings or carry product meaning.
 
@@ -118,5 +118,5 @@ a missing Android default can look like a leftover translation, and should be re
 
 ## Finish
 
-Run `localship validate` and `localship status`, and tell the user the next step: the `localship-translate` skill
-(or `localship translate --model …` for a large catalog). Commit nothing unless the user asks.
+Run `localship validate` and `localship status`, and tell the user the next step: translating (the
+`localship-translate` skill). Commit nothing unless the user asks.

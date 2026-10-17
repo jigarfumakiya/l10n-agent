@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Target } from "../formats/types.js";
-import { fixedTranslation, glossaryHits, voiceFor } from "./context.js";
+import { conventionalVoice, fixedTranslation, glossaryHits, voiceFor } from "./context.js";
 import { UserError } from "./errors.js";
 import { hashMessage } from "./hash.js";
 import { getLockEntry, type Lockfile, type StoredState, setLockEntry, writeLock } from "./lock.js";
@@ -8,6 +8,7 @@ import { displayKey, type Entry, type Message, messageValues } from "./model.js"
 import {
   findTarget,
   type Project,
+  projectGlossary,
   projectLocales,
   reopenProject,
   withProjectWrite,
@@ -61,7 +62,11 @@ export interface Batch {
   /** Entries still needing work after this batch. */
   remaining: number;
   brief?: string;
-  locales: Record<string, { language: string; voice?: string }>;
+  /**
+   * Per locale: the project's voice, or when it has none, `defaultVoice`, the usual convention
+   * for that language, so batches stay consistent until the user sets their own.
+   */
+  locales: Record<string, { language: string; voice?: string; defaultVoice?: string }>;
   /** How each target's values are written. */
   formats: Record<string, string>;
 }
@@ -194,7 +199,7 @@ export async function nextBatch(project: Project, opts: BatchOptions = {}): Prom
   const offset = opts.offset ?? 0;
   const wanted = opts.keys ? new Set(opts.keys) : undefined;
   const memory = buildMemory(project, locales);
-  const glossary = project.context.glossary;
+  const glossary = projectGlossary(project);
 
   const items: BatchItem[] = [];
   let matched = 0;
@@ -296,7 +301,13 @@ export async function nextBatch(project: Project, opts: BatchOptions = {}): Prom
     locales: Object.fromEntries(
       usedLocales.map((l) => {
         const voice = voiceFor(project.context, l);
-        return [l, { language: languageName(l), ...(voice ? { voice } : {}) }];
+        return [
+          l,
+          {
+            language: languageName(l),
+            ...(voice ? { voice } : { defaultVoice: conventionalVoice(l) }),
+          },
+        ];
       }),
     ),
     formats: Object.fromEntries(
@@ -515,7 +526,7 @@ async function submitUnlocked(
       ...checkTranslation(target, target.pluralSpec(locale), src, tgt, {
         locale,
         sourceLocale: project.config.sourceLocale,
-        glossary: project.context.glossary,
+        glossary: projectGlossary(project),
         role: usages ? roleOf(usages.find(target, src)) : undefined,
       }).filter((f) => f.code !== "plural-missing-category" && f.code !== "plural-extra-category"),
       ...checkPluralForms(target, locale, message),

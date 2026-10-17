@@ -70,7 +70,10 @@ describe("nextBatch", () => {
       "xcstrings Cancel",
     ]);
     expect(batch.brief).toContain("calm budgeting");
-    expect(batch.locales).toEqual({ ar: { language: "Arabic" } });
+    // No voice file for Arabic: the usual convention comes with the batch instead.
+    expect(batch.locales).toEqual({
+      ar: { language: "Arabic", defaultVoice: expect.stringMatching(/Modern Standard Arabic/) },
+    });
     const [save, welcome, days] = batch.items;
     expect(save).toMatchObject({ comment: "Button that saves the budget", state: "missing" });
     expect(welcome).toMatchObject({
@@ -93,9 +96,23 @@ describe("nextBatch", () => {
     const first = await nextBatch(p, { locales: ["hi"], limit: 2 });
     expect(first.items).toHaveLength(2);
     expect(first.remaining).toBe(3);
-    expect(first.locales.hi?.voice).toBe("Use तुम, not आप.");
+    expect(first.locales.hi).toEqual({ language: "Hindi", voice: "Use तुम, not आप." });
     const second = await nextBatch(p, { locales: ["hi"], limit: 2, offset: 2 });
     expect(second.items.map((i) => i.key)).toEqual(["days_left", "cancel"]);
+  });
+
+  it("keeps the Android app name as written without a glossary entry or file", async () => {
+    const strings = STRINGS.replace(
+      "<resources>",
+      '<resources>\n    <string name="app_name">Jotter</string>\n    <string name="hello">Jotter keeps your notes</string>',
+    );
+    const fs = project({
+      "/p/app/src/main/res/values/strings.xml": strings,
+      "/p/.localship/glossary.yaml": "terms: []",
+    });
+    const batch = await nextBatch(await open(fs), { locales: ["hi"], keys: ["hello"] });
+    expect(batch.items[0]?.glossary).toEqual([{ term: "Jotter", keep: true }]);
+    expect(fs.files.get("/p/.localship/glossary.yaml")).toBe("terms: []");
   });
 });
 

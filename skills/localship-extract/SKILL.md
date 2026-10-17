@@ -14,9 +14,9 @@ the rules below keep it safe. Change how text is looked up, never what the app d
 `localship detect` (or `localship_detect`) gives a first estimate: how much UI text is still in the
 code, per module, with examples. Use it to size the work, then search properly as below.
 
-Search the UI code for user-facing literals and show the user a summary grouped by screen or
-feature, with counts. Ask whether to do the whole app or one feature first. For big apps, go one
-feature at a time and build after each.
+Do the scope the user asked for: the whole app for "make the app localizable", or just the
+screens or features they named. Search that code for user-facing literals, say in one line how
+much you found, and start. Build as you go, and give a short progress update after each part.
 
 **Android (Kotlin, Compose, Views)**, look for string literals in:
 - `Text("…")`, `text = "…"`, `label = { Text("…") }`, `title = "…"`, `placeholder`, `contentDescription = "…"`
@@ -45,18 +45,21 @@ not translatable.
   Keep a default for every resource the app uses; a definition only in `values-en` is not a default.
   Check the merged resources with Android lint for the relevant build variants, especially when
   libraries, flavors or multiple source sets supply defaults.
-- Key names: `screen_role` in snake_case (`budget_title`, `budget_save_button`). Reuse an existing
-  key when the text *and* meaning are the same; otherwise make a new one.
-- Add a comment above each string saying where it appears and what placeholders mean:
-  `<!-- Budget screen: button that saves the plan. %1$s is the month name -->`
+- Key names and comments: follow the project's existing resources. If there are none, use
+  `screen_role` in snake_case (`settings_title`, `settings_save_button`) with a comment above each
+  string saying where it appears and what placeholders mean
+  (`<!-- Settings screen: saves changes. %1$s is the profile name -->`), and say so in your report.
+  Reuse an existing key when the text *and* meaning are the same; otherwise make a new one.
 - Escape `'` as `\'` and `"` as `\"`; `&` as `&amp;`.
 - **Never concatenate** text: one string with numbered placeholders (`%1$s`, `%2$d`) per sentence,
   so translators can reorder.
 - **Counts use plurals:** `<plurals name="…"><item quantity="one">%d item</item><item quantity="other">%d items</item></plurals>`.
 - Compose: `stringResource(R.string.key)`, `stringResource(R.string.key, arg)`,
   `pluralStringResource(R.plurals.key, count, count)`.
-- Outside composables: `context.getString(…)` / `resources.getQuantityString(…)`. Don't pass a
-  `Context` into a ViewModel: expose `@StringRes` ids, or a small `UiText` wrapper resolved in the UI.
+- Outside composables: `context.getString(…)` / `resources.getQuantityString(…)`. For text built
+  in view models or other non-UI code, follow the pattern the project already uses. If it has
+  none, expose `@StringRes` ids or a small `UiText` wrapper resolved in the UI rather than passing
+  a `Context`, and say so in your report.
 - Money, numbers and dates go through formatters (`NumberFormat`, `DateTimeFormatter.ofLocalizedDate`),
   never hand-built strings. Keep the amount signed and set its actual currency; changing the display
   language must not change the currency. Respect the user's regional and numbering preferences.
@@ -78,7 +81,7 @@ not translatable.
   targets. Build all relevant schemes/targets and supported platforms before translating;
   building only the main app may miss platform-conditional strings and extension resources.
 - `Text("literal")`, `Button("literal")`, `Label("literal", …)` are extracted by Xcode
-  automatically. Add a comment where the meaning isn't obvious: `Text("Save", comment: "Saves the budget")`.
+  automatically. Add a comment where the meaning isn't obvious: `Text("Save", comment: "Saves the profile")`.
 - Prefer `LocalizedStringResource` for passing localizable text through models and custom views;
   use `String(localized:)` where a resolved string is needed. Avoid caching resolved translations
   across language changes. `LocalizedStringKey` also works for SwiftUI-specific view APIs.
@@ -111,7 +114,7 @@ not translatable.
   "AR (XB)" shows right-to-left layout problems.
 - iOS: Scheme › Run › Options › App Language › "Accented Pseudolanguage" (and "Right-to-Left
   Pseudolanguage"). Plain English left over was missed.
-- Ask the user to run these if you can't; list the screens to check.
+- If you can't run these, list the screens for the user to check.
 
 ### Text the resource files can't show
 
@@ -140,6 +143,7 @@ references and the final test checklist.
 
 ## 5. Then
 
-Run `localship detect` (or `localship_detect`): it should now find the strings. Continue with the
-`localship-setup` skill. Commit nothing unless the user asks; suggest committing the extraction on its
-own before translating, so the diff is easy to review.
+Run `localship detect` (or `localship_detect`): it should now find the strings. Report what you
+moved, and any convention you had to pick. If the user also asked for translation, continue with
+the `localship` skill. Don't create branches or commit unless the user asks; if they do commit,
+suggest committing the extraction on its own, so the diff is easy to review.

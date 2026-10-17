@@ -81,6 +81,39 @@ export function voiceFor(context: ProjectContext, locale: string): string | unde
   return text || undefined;
 }
 
+/**
+ * The usual formality and tone per language, sent with batches when the project has no voice
+ * of its own so every batch addresses the user the same way. Never written to a file.
+ */
+const VOICE_CONVENTIONS: Record<string, string> = {
+  hi: "Address the user as आप (polite). Everyday Hindi over Sanskritized words; common English tech words (app, sync) may stay in English.",
+  ar: "Modern Standard Arabic, addressing the user neutrally. Short sentences.",
+  de: "Address the user as du, as most consumer apps do.",
+  fr: "Address the user as vous.",
+  es: "Address the user as tú. Neutral Spanish that works in Spain and Latin America.",
+  it: "Address the user as tu.",
+  "pt-BR": "Address the user as você (Brazilian Portuguese conventions).",
+  "pt-PT": "European Portuguese spelling and vocabulary (utilizador, ecrã), not Brazilian.",
+  nl: "Address the user as je.",
+  ru: "Address the user as вы (lowercase).",
+  ja: "Polite です/ます form. Short, natural UI phrasing.",
+  ko: "Polite 해요체. Short, natural UI phrasing.",
+  zh: "Neutral, concise UI language; no honorifics needed.",
+  tr: "Address the user as siz.",
+  pl: "Address the user informally (ty), as most consumer apps do.",
+  id: "Address the user as Anda.",
+  vi: "Address the user as bạn.",
+  th: "Polite, neutral tone; use ครับ/ค่ะ only where a sentence needs it.",
+};
+
+export function conventionalVoice(locale: string): string {
+  return (
+    VOICE_CONVENTIONS[locale] ??
+    VOICE_CONVENTIONS[locale.split("-")[0] as string] ??
+    "Polite, neutral tone, as a well-made app in this language would use."
+  );
+}
+
 const WORD = "[\\p{L}\\p{M}\\p{N}]";
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

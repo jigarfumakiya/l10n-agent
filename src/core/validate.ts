@@ -9,7 +9,7 @@ import {
   type PluralSpec,
   type ValueAnalysis,
 } from "./model.js";
-import { type Project, projectLocales } from "./project.js";
+import { type Project, projectGlossary, projectLocales } from "./project.js";
 import { inconsistencies, lengthCheck, roleOf, textChecks, type UiRole } from "./qa.js";
 import { entryState } from "./status.js";
 import type { UsageIndex } from "./usage.js";
@@ -154,7 +154,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
           ...checkTranslation(loaded, spec, src, tgt, {
             locale,
             sourceLocale: project.config.sourceLocale,
-            glossary: project.context.glossary,
+            glossary: projectGlossary(project),
             role: opts.usages ? roleOf(opts.usages.find(loaded, src)) : undefined,
           }).map((i) => ({ ...where, ...i })),
         );

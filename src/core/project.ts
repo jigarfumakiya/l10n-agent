@@ -4,9 +4,10 @@ import { poAdapter } from "../formats/po/adapter.js";
 import type { FormatAdapter, Target } from "../formats/types.js";
 import { xcstringsAdapter } from "../formats/xcstrings/adapter.js";
 import { type Config, loadConfig, type TargetConfig, targetId } from "./config.js";
-import { loadContext, type ProjectContext } from "./context.js";
+import { type GlossaryTerm, loadContext, type ProjectContext } from "./context.js";
 import type { FileSystem } from "./fs.js";
 import { type Lockfile, readLock } from "./lock.js";
+import { messageValues } from "./model.js";
 
 const ADAPTERS: {
   [F in TargetConfig["format"]]: FormatAdapter<Extract<TargetConfig, { format: F }>>;
@@ -53,6 +54,25 @@ export async function openProject(
     targets,
     fs,
   };
+}
+
+/**
+ * The glossary translators work with: the project's own, plus the Android app name kept as
+ * written when the glossary doesn't mention it. Nothing is written to the glossary file.
+ */
+export function projectGlossary(project: Project): GlossaryTerm[] {
+  const known = new Set(project.context.glossary.map((t) => t.term.toLowerCase()));
+  const extra: GlossaryTerm[] = [];
+  for (const { target } of project.targets) {
+    if (target.format !== "android-xml") continue;
+    const entry = target.source.entries.get("app_name");
+    const value = entry?.message.kind === "text" ? messageValues(entry.message)[0]?.[1] : undefined;
+    const name = entry && value ? target.analyze(value, entry).text.trim() : "";
+    if (!name || known.has(name.toLowerCase())) continue;
+    known.add(name.toLowerCase());
+    extra.push({ term: name, translate: false, caseSensitive: false });
+  }
+  return extra.length ? [...project.context.glossary, ...extra] : project.context.glossary;
 }
 
 /** Opens one target with its format's adapter. */

@@ -17,8 +17,8 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 
 | Command | What it does |
 |---|---|
-| `localship plan [languages…]` | One plan for a request: what it found, blockers and their fix, strings to translate, defaults (voice per language, names kept), steps. Writes nothing. Languages can be names (`hindi`) or codes |
-| `localship start <languages…>` | Does the setup in one go: config (or adds the languages), default voice notes and glossary, never overwriting yours. With `--model` (or `models.default` in the config) it translates right away |
+| `localship plan [languages…]` | What a request involves: the files, strings to translate, blockers and their fix, notes (text still in the code), and what translators go by (voice per language, names kept). Writes nothing and decides nothing. Languages can be names (`hindi`) or codes |
+| `localship start <languages…>` | Writes the config (or adds the languages to it) and nothing else. With `--model` (or `models.default` in the config) it then translates |
 | `localship detect` | Lists the translation files in the repo, with evidence and confidence. Writes nothing |
 | `localship init` | Detects, asks, and writes `.localship/config.yaml` |
 | `localship status` | Progress per target and locale, plus duplicate keys and translations of deleted strings |
@@ -218,6 +218,12 @@ Translations are only as good as the context. These live next to your config in 
 | `brief.md` | What the app does, who it's for, the tone of its copy |
 | `voice/all.md`, `voice/<locale>.md` | Voice rules for every locale, and per locale (formality, loanwords, numbers) |
 | `glossary.yaml` | Names to keep as written, and terms with fixed translations |
+
+Localship writes these only when you ask (the setup skill, `localship_update_context`, or by
+hand). Until then, batches carry two fallbacks so translations stay consistent: `defaultVoice`,
+the usual formality for each language that has no voice file, and the Android `app_name` kept as
+written when the glossary doesn't mention it. Neither is written to a file; agents name them in
+their report so you can change them.
 
 ```yaml
 # .localship/glossary.yaml

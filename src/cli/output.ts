@@ -228,37 +228,31 @@ export function printPlan(p: Plan): void {
   if (p.locales.length) {
     const per = Math.max(0, ...Object.values(p.work));
     const total = Object.values(p.work).reduce((a, b) => a + b, 0);
-    const about = p.ready ? "" : "about ";
-    const count =
-      p.locales.length > 1
-        ? `${about}${per} strings, ${total} translations`
-        : `${about}${per} strings`;
+    const count = p.locales.length > 1 ? `${per} strings, ${total} translations` : `${per} strings`;
     console.log(
       `Languages: ${p.locales.map((l) => `${l.name} (${l.code}${l.isNew ? ", new" : ""})`).join(", ")} · ${count}`,
     );
   }
   for (const w of p.warnings) console.log(`${yellow("▲")} ${w}`);
-  for (const b of p.blockers) console.log(`${yellow("▲")} ${b.message}`);
-  console.log();
-  console.log(bold("Plan"));
-  for (const [i, s] of p.steps.entries()) console.log(`  ${i + 1}. ${s}`);
-  if (p.locales.length || p.defaults.keepAsWritten.length) {
+  for (const b of p.blockers) console.log(`${yellow("▲")} ${b.message} ${dim(b.fix)}`);
+  for (const n of p.notes) console.log(`${dim("·")} ${n}`);
+  if (p.locales.length) {
     console.log();
-    console.log(bold("Defaults") + dim(" (change any of them before starting)"));
-    for (const [l, v] of Object.entries(p.defaults.voice)) console.log(`  ${l}: ${v}`);
-    if (p.defaults.keepAsWritten.length) {
-      console.log(`  Kept as written: ${p.defaults.keepAsWritten.join(", ")}`);
+    console.log(bold("Translators go by"));
+    for (const [l, v] of Object.entries(p.voice)) {
+      console.log(`  ${l}: ${v.text}${v.fromProject ? "" : dim(" (usual convention)")}`);
     }
+    if (p.keepAsWritten.length) console.log(`  Kept as written: ${p.keepAsWritten.join(", ")}`);
+    if (!p.brief)
+      console.log(dim("  No brief yet (.localship/brief.md); the README gives context."));
   }
   console.log();
   const codes = p.locales.map((l) => l.code).join(",");
   console.log(
-    !p.confirm
-      ? yellow("Sort out the item above first.")
-      : p.ready
-        ? green(
-            `Ready. Tell your agent "${p.confirm}", or run \`localship start ${codes} --model …\` to translate here.`,
-          )
-        : green(`Tell your agent "${p.confirm}" to begin with step 1 (that step needs an agent).`),
+    p.ready
+      ? green(
+          `Ready. Ask your agent to translate, or run \`localship start ${codes} --model …\` to translate here.`,
+        )
+      : yellow("Sort out the item above first."),
   );
 }

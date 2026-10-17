@@ -50,7 +50,7 @@ export function createServer(opts: ServerOptions): McpServer {
     { name: "localship", version: opts.version },
     {
       instructions:
-        "Localization for app projects (Android XML, gettext PO, Apple String Catalogs). For any direct request (translate the app, add a language, update translations), call localship_plan first, show the user its short plan ending with the confirm phrase, and once they say it, follow the plan's steps without more questions: localship_start, then localship_next_batch → localship_submit until nothing remains, then localship_validate. For status questions use localship_status, or localship_detect when there's no config. Never edit translation files by hand when these tools can do it.",
+        "Localization for app projects (Android XML, gettext PO, Apple String Catalogs). Do what the user asked and nothing more. For a request to translate, add a language or update translations: localship_plan to see what's there, localship_start if the languages aren't set up, then localship_next_batch → localship_submit until nothing remains, then localship_validate, and report. Stop to ask only when the plan has blockers or warnings. Don't create branches, move hardcoded text, write context files or commit unless asked. For status questions use localship_status, or localship_detect when there's no config. Never edit translation files by hand when these tools can do it.",
     },
   );
   const dir = (cwd?: string) => path.resolve(opts.cwd, cwd ?? ".");
@@ -80,7 +80,8 @@ export function createServer(opts: ServerOptions): McpServer {
 
   tool(
     "localship_plan",
-    'Call this first for any direct request: "translate this app to Hindi", "add French", "update the translations". It looks at the project and returns a ready plan: what it found, blockers with their fix, how many strings, the defaults it chose (voice per language, names kept as written), the steps, and the confirm phrase. Show the user a short version (what it found, the steps, the defaults they can change) and end with: Say "<confirm>" to go. Once they say it, follow the steps in order without asking more questions. If confirm is empty, explain the blocker instead.',
+    "Read-only look at a request (translate the app, add a language, update translations): the files, strings to translate per language, blockers, warnings (another tool manages translations: ask before writing), notes (text still in the code: mention it, act only if asked), and what translators go by (voice per language, names kept). No confirmation needed: carry on with what the user asked unless there are blockers or warnings.",
+
     {
       cwd: cwdArg,
       locales: z
@@ -94,18 +95,10 @@ export function createServer(opts: ServerOptions): McpServer {
 
   tool(
     "localship_start",
-    "Do the setup step of a confirmed plan in one call: creates .localship/config.yaml (or adds the languages to it), and writes default voice notes and a glossary of names to keep, without overwriting existing ones. Then draft the brief if there is none, and translate.",
+    "Create .localship/config.yaml for these languages, or add them to the existing one. Writes nothing else.",
     {
       cwd: cwdArg,
       locales: z.array(z.string()).min(1).describe("Languages, as codes or names"),
-      voice: z
-        .record(z.string(), z.string())
-        .optional()
-        .describe("Voice per locale, if the user changed the plan's defaults"),
-      keepAsWritten: z
-        .array(z.string())
-        .optional()
-        .describe("Names to keep as written, if the user changed the plan's list"),
     },
     async ({ cwd, ...o }) => start(fs, dir(cwd), o),
   );
@@ -327,7 +320,7 @@ ${TRANSLATION_RULES}`,
 
   tool(
     "localship_translate",
-    "Translate everything missing with a separate model API (configured under models: in .localship/config.yaml, or pass model as provider:model). Use for large catalogs; needs the provider's API key in the environment.",
+    "Translate everything missing with a separate model API (configured under models: in .localship/config.yaml, or pass model as provider:model). Only when the user asks for it: cloud providers bill per use and need their API key in the environment.",
     {
       cwd: cwdArg,
       locales: localesArg,

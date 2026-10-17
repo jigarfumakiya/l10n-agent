@@ -10,7 +10,7 @@ The tool picks the strings, gives you the context, checks every translation in c
 You translate. Don't edit translation files by hand.
 
 > For a direct request ("translate this app to Hindi"), start with the `localship` skill: it
-> plans once, asks for one confirmation, and then uses this playbook without more questions.
+> checks the project, then uses this playbook.
 
 ## Running the tool
 
@@ -28,17 +28,15 @@ Read the status notes too. Unsupported Apple variations and Android configuratio
 from the counts; report them as uncovered work and preserve their structure. Zero remaining
 batch entries does not mean those strings have been translated or validated.
 
-- **Up to a few hundred strings:** translate them yourself (step 2).
-- **More than that**, or the user wants it done without you: delegate to a model API with
-  `localship translate --model <provider:model>` (or `models:` in the config). Providers:
-  `anthropic`, `openai`, `gemini`, `openrouter` (keys from `ANTHROPIC_API_KEY`,
-  `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`), and local `ollama`, `lmstudio`.
-  It runs the same checks and retries rejected strings. Then review what it reports as failed
-  and translate those yourself.
+Translate them yourself (step 2), however many there are. Use a model API
+(`localship translate --model <provider:model>`) only when the user asks for it: cloud providers
+(`anthropic`, `openai`, `gemini`, `openrouter`) bill per use and need their API key; local
+`ollama` and `lmstudio` are free. It runs the same checks; translate what it reports as failed
+yourself.
 
-Read `.localship/brief.md`, `.localship/voice/` and `.localship/glossary.yaml` once if they exist. If
-there's no brief, write a short one first (see `localship-setup`): translations without context
-come out generic.
+Read `.localship/brief.md`, `.localship/voice/` and `.localship/glossary.yaml` once if they exist.
+If there's no brief, read the README for what the app does and its tone; don't write a brief
+unless the user asks.
 
 ## 2. The loop
 
@@ -54,7 +52,8 @@ come out generic.
    - `editedByHand: true` — a person edited the current translation. Keep their wording where you
      can, and show the user your proposed change: `submit` refuses it until they agree (then pass
      `--force` for just those strings).
-   The batch also carries the `brief`, each locale's `voice`, and notes per format.
+   The batch also carries the `brief`, each locale's `voice` (or `defaultVoice`, the usual
+   convention, when the project has set none), and notes per format.
 
 2. Translate every item following these rules:
    - Natural, concise UI language a native speaker would write, in the brief's tone and the
@@ -103,14 +102,15 @@ come out generic.
   after review and approval, `validate --require-approved` also enforces approval. Unsupported
   content blocks both checks; use the platform tools for that content and report the limitation.
 - Run `localship status` and report per locale: how many drafts were written, anything that
-  failed, warnings you left and why, and terms you were unsure of.
+  failed, warnings you left and why, and terms you were unsure of. Say which voice you followed
+  (especially a `defaultVoice`) so the user can change it.
 - **Don't approve your own drafts.** Suggest the user reviews them (the `localship-review` skill),
   then `localship approve`.
 - For a right-to-left language (Arabic, Hebrew, Persian, Urdu), or any first translation, tell the
   user what still needs a device: the layout mirrored, long text cut off, plurals at 0, 1, 2, 5
   and 11, switching language while the app is open, charts, amounts with a sign, and names
-  stored in data. Offer to look for these in the code (the `localship-extract` skill lists
-  them); Localship's checks only cover the translation files.
+  stored in data. Localship's checks only cover the translation files; the `localship-extract`
+  skill lists where to look in the code if the user wants that checked.
 - Never pass `--force` unless the user explicitly asks: it replaces translations a person
   wrote, reviewed or approved.
 

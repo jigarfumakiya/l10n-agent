@@ -1,13 +1,12 @@
 ---
 name: localship
-description: Handle any request to localize an app with Localship — "translate this app to Hindi", "add French", "localize the app", "update the translations". Shows one short plan, waits for the user to say the confirm phrase, then does everything end to end. Use this first for direct requests; the other localship-* skills are the detailed playbooks it follows.
+description: Handle any request to localize an app with Localship — "translate this app to Hindi", "add French", "localize the app", "update the translations". Does what was asked end to end and reports, stopping only when something is in the way. Use this first for direct requests; the other localship-* skills are the detailed playbooks it follows.
 ---
 
-# Localize an app with Localship: plan once, then do it all
+# Localize an app with Localship
 
-The user wants their app translated with as little back-and-forth as possible. Make every
-choice that has a sensible default, show it once, and after they confirm, don't stop to ask
-again unless something is genuinely blocked.
+Do what the user asked, all of it, and nothing they didn't ask for. Don't ask for a go-ahead
+on a normal request; stop only when something is genuinely in the way.
 
 ## Tools
 
@@ -15,53 +14,56 @@ Use the `localship_*` MCP tools when available. Otherwise the CLI: `localship pl
 `localship start`, `localship next-batch`, `localship submit` (install once with
 `npm install -g localship` if it's missing).
 
-## 1. Plan (one tool call, one message)
+## 1. Look
 
-Call `localship_plan` with the languages from the request, as names or codes
-(`["Hindi"]`, `["hi", "ar"]`). Then reply with a short message, at most about 10 lines:
+Check `git status`; if there are uncommitted changes, mention them so the user can tell your
+changes from theirs. Then call `localship_plan` with the languages from the request, as names or
+codes (`["Hindi"]`, `["hi", "ar"]`). It writes nothing.
 
-- **What I found:** the files, how many strings, and anything in the way (the plan's `blockers`).
-  If the plan has `warnings` (another tool, like Crowdin or an over-the-air SDK, already manages
-  translations), say so plainly and ask whether to go ahead anyway.
-- **What I'll do:** the plan's `steps`, briefly.
-- **Defaults:** voice per language and names kept as written (the plan's `defaults`). Say
-  they can change any of them in their reply.
-- End with: **Say "<confirm>" to go.** (Use the plan's `confirm` phrase exactly.)
+Stop and ask only when:
+- **`blockers`**: no language named, a format Localship can't translate, an empty String
+  Catalog, or no translation files at all. Say what's in the way and what would get past it.
+- **`warnings`**: another tool (Crowdin, an over-the-air SDK…) already manages translations.
+  Writing files could clash with it; ask whether to go ahead.
 
-If `confirm` is empty, explain the blocker plainly instead (for example, an unsupported
-format) and stop. If the request names no language, ask which ones in the same message.
+Otherwise carry on. Tell the user in one line what you're about to do, e.g. "Translating 412
+strings into Hindi and Arabic." If the plan has `notes` (text still in the code), mention them in
+that line too: those strings won't be translated unless the user asks you to move them.
 
-Check `git status` before planning. If there are uncommitted changes, mention it in the plan:
-the user should be able to tell your changes from theirs.
+## 2. Do it
 
-## 2. Do it (after they say the confirm phrase)
-
-Follow the plan's steps in order without asking more questions. Apply any defaults they changed.
-
-1. **Blockers first.** For `mostly-hardcoded`: create a branch (`localization`), then follow the
-   `localship-extract` skill to move the text into resources, building as you go. For a large
-   app, do it feature by feature, and give a one-line progress update after each.
-2. **Set up:** `localship_start` with the languages (plus `voice` or `keepAsWritten` if the user
-   changed them). It writes the config, voice notes and glossary.
-3. **Brief:** if there's none, write `.localship/brief.md` (or `localship_update_context`) from
-   the README and strings: what the app does, who it's for, its tone, in a few lines.
-4. **Translate:** follow the `localship-translate` skill's loop (`localship_next_batch` →
+1. **Set up:** if the languages aren't configured yet, `localship_start` with them. It writes
+   only the config.
+2. **Translate:** follow the `localship-translate` skill's loop (`localship_next_batch` →
    translate → `localship_submit`, fix rejections) until `remaining` is 0 for every language.
-   For thousands of strings with a model configured, `localship_translate` is faster.
-5. **Check:** `localship_validate` must show no errors.
-6. **Report** in a few lines: strings translated per language, anything held for review or
-   failed, the brief and glossary you wrote (so they can adjust them), and the next step:
-   review the drafts (the `localship-review` skill), then approve.
+3. **Check:** `localship_validate` must show no errors.
 
-Stop and ask only if something blocks progress: the build breaks during extraction and the
-fix isn't obvious, a tool keeps failing, or a choice would change the app's behavior.
+## 3. Report
+
+In a few lines:
+- strings translated per language, and anything that failed or was held for review;
+- what translators went by: each language's voice (the project's, or the usual convention the
+  batch gave as `defaultVoice`, e.g. "addressed the user as आप") and names kept as written, so
+  the user can correct them;
+- the plan's notes, such as text still in the code;
+- next step: review the drafts (the `localship-review` skill), then approve.
+
+If the user asks for something different (another formality, a brief, a glossary term), write it
+with `localship_update_context` or the files in `.localship/`, and redo what it affects.
+
+## Only when the user asks
+
+- moving hardcoded text into resources (the `localship-extract` skill);
+- creating a branch, committing or pushing;
+- writing a brief, voice notes or glossary;
+- translating through a model API (`localship_translate`): cloud providers bill per use;
+- approving drafts, pruning, removing or `--force` (these change or delete people's work).
 
 ## Other requests
 
-- **"Add <language>":** same flow; the plan shows only the new language's work.
-- **"Update the translations" / copy changed:** same flow; the plan counts missing and stale
-  strings. Hand-edited translations are held for review, never replaced.
-- **"What's the status?":** `localship_status` (or `localship_detect` without a config). No plan needed.
+- **"Add <language>" / "Update the translations":** the same flow; the plan counts missing and
+  stale strings. Hand-edited translations are held for review, never replaced.
+- **"What's the status?":** `localship_status` (or `localship_detect` without a config).
 - **"Review" / "approve":** the `localship-review` skill.
-
-Never approve drafts on your own, and commit nothing unless the user asks.
+- **"Set up localization":** the `localship-setup` skill.
+- **"Make the app localizable" / "find hardcoded strings":** the `localship-extract` skill.

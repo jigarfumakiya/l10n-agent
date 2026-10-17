@@ -1,5 +1,4 @@
 import path from "node:path";
-import { stringify as toYaml } from "yaml";
 import { runInit } from "../cli/init-command.js";
 import { type DetectResult, detect, mostlyHardcoded } from "../detect/detect.js";
 import { hardcodedNotes } from "../detect/hardcoded.js";
@@ -7,79 +6,47 @@ import { defaultSelection } from "../detect/init.js";
 import { findOtherSystems } from "../detect/others.js";
 import { walk } from "../detect/walk.js";
 import { addLocales, CONFIG_FILE, loadConfig } from "./config.js";
-import { CONTEXT_FILES } from "./context.js";
+import { conventionalVoice, voiceFor } from "./context.js";
 import { UserError } from "./errors.js";
 import type { FileSystem } from "./fs.js";
-import { openProject, type Project, projectLocales } from "./project.js";
+import { openProject, type Project, projectGlossary, projectLocales } from "./project.js";
 import { computeStatus } from "./status.js";
 import { languageName } from "./workflow.js";
 
 /**
- * The fast path for direct requests ("translate this app to Hindi"): look at the project,
- * decide everything that has a sensible default, and return one plan the user confirms once.
- * After that, `start` does the setup and the agent translates without more questions.
+ * A read-only look at what a request involves ("translate this app to Hindi"): the files,
+ * how much there is to translate, anything in the way, and what translators will go by.
+ * It decides nothing for the user and needs no confirmation; the agent does what was asked.
  */
 export interface Plan {
-  /** Nothing stands in the way: the user can say the confirm phrase and translation starts. */
+  /** Nothing stands in the way of translating. */
   ready: boolean;
   configured: boolean;
   sourceLocale: string;
   locales: Array<{ code: string; name: string; isNew: boolean }>;
   /** Translation files Localship will work on. */
   targets: Array<{ format: string; path: string; strings: number }>;
-  /** Strings to translate (missing or stale), per locale. */
+  /** Strings in the translation files to translate (missing or stale), per locale. */
   work: Record<string, number>;
-  /** Worth knowing before starting, but not in the way (another tool managing translations…). */
+  /** Another tool already manages translations: ask the user before writing any. */
   warnings: string[];
-  /** Things to fix first, each with what the agent will do about it. */
+  /** Worth telling the user, but nothing to act on unless they ask (text still in the code…). */
+  notes: string[];
+  /** What stops translation, and what would get past it. */
   blockers: Array<{ kind: Blocker; message: string; fix: string }>;
-  /** Choices made for the user, which they can change in their reply. */
-  defaults: {
-    voice: Record<string, string>;
-    keepAsWritten: string[];
-    brief: "exists" | "will be drafted";
-  };
-  /** What will happen, in order, once confirmed. */
-  steps: string[];
-  /** What the user says to go ahead. */
-  confirm: string;
+  /** Voice per locale: the project's own, or the usual convention for that language. */
+  voice: Record<string, { text: string; fromProject: boolean }>;
+  /** Names kept as written: the glossary's, plus the app name. */
+  keepAsWritten: string[];
+  /** Whether the project has a brief. */
+  brief: boolean;
 }
 
 export type Blocker =
-  | "mostly-hardcoded"
   | "no-translation-files"
   | "unsupported-format"
   | "empty-catalog"
   | "no-locales";
-
-/** Formality and tone most apps use, per language. Stated in the plan so the user can change it. */
-const VOICE_DEFAULTS: Record<string, string> = {
-  hi: "Address the user as आप (polite). Everyday Hindi over Sanskritized words; common English tech words (app, sync) may stay in English.",
-  ar: "Modern Standard Arabic, addressing the user neutrally. Short sentences.",
-  de: "Address the user as du, as most consumer apps do.",
-  fr: "Address the user as vous.",
-  es: "Address the user as tú. Neutral Spanish that works in Spain and Latin America.",
-  it: "Address the user as tu.",
-  pt: "Address the user as você (Brazilian Portuguese conventions).",
-  nl: "Address the user as je.",
-  ru: "Address the user as вы (lowercase).",
-  ja: "Polite です/ます form. Short, natural UI phrasing.",
-  ko: "Polite 해요체. Short, natural UI phrasing.",
-  zh: "Neutral, concise UI language; no honorifics needed.",
-  tr: "Address the user as siz.",
-  pl: "Address the user informally (ty), as most consumer apps do.",
-  id: "Address the user as Anda.",
-  vi: "Address the user as bạn.",
-  th: "Polite, neutral tone; use ครับ/ค่ะ only where a sentence needs it.",
-};
-
-export function defaultVoice(locale: string): string {
-  return (
-    VOICE_DEFAULTS[locale] ??
-    VOICE_DEFAULTS[locale.split("-")[0] as string] ??
-    "Polite, neutral tone, as a well-made app in this language would use."
-  );
-}
 
 const COMMON_LANGUAGES = (
   "af am ar az be bg bn bs ca cs cy da de el en es et eu fa fi fil fr ga gl gu he hi hr hu hy id is it ja ka kk km kn ko ky lo lt lv mk ml mn mr ms my nb ne nl or pa pl ps pt ro ru si sk sl sq sr sv sw ta te th tl tr uk ur uz vi zh zu " +
@@ -106,10 +73,10 @@ export function resolveLocale(input: string): string {
   );
 }
 
-/** The app's name, to keep as written in every language. */
-async function appNames(fs: FileSystem, root: string, result?: DetectResult): Promise<string[]> {
+/** The app's name, from the Android default strings, to keep as written in every language. */
+async function appNames(fs: FileSystem, root: string, result: DetectResult): Promise<string[]> {
   const names = new Set<string>();
-  for (const c of result?.candidates ?? []) {
+  for (const c of result.candidates) {
     if (c.target.format !== "android-xml") continue;
     try {
       const xml = await fs.readFile(path.join(root, c.target.path, "values", "strings.xml"));
@@ -118,16 +85,6 @@ async function appNames(fs: FileSystem, root: string, result?: DetectResult): Pr
     } catch {
       // No strings.xml at the usual place.
     }
-  }
-  try {
-    const readme = await fs.readFile(path.join(root, "README.md"));
-    const heading = /^#\s+(.+)$/m
-      .exec(readme)?.[1]
-      ?.replace(/[^\p{L}\p{N} .-]/gu, "")
-      .trim();
-    if (heading && heading.split(/\s+/).length <= 3) names.add(heading);
-  } catch {
-    // No README.
   }
   return [...names];
 }
@@ -148,12 +105,16 @@ export async function plan(fs: FileSystem, cwd: string, opts: PlanOptions = {}):
   return project ? planConfigured(project, requested) : planNew(fs, cwd, requested);
 }
 
+const EXTRACT =
+  "They won't be translated until they're moved into string resources (the localship-extract skill, when the user asks for it).";
+
 async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promise<Plan> {
   const result = await detect(fs, path.resolve(cwd));
   const picked = defaultSelection(result).map((n) => result.candidates[n - 1]);
   const chosen = picked.filter((c): c is NonNullable<typeof c> => c !== undefined);
   const locales = requested.length ? requested : result.locales;
   const blockers: Plan["blockers"] = [];
+  const notes: string[] = [];
 
   if (chosen.length === 0) {
     const unsupported = result.unsupported.map((u) => u.format).join(", ");
@@ -167,17 +128,15 @@ async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promis
         : {
             kind: "no-translation-files",
             message: `No translation files yet. ${result.hints[0] ?? ""}`.trim(),
-            fix: "Move the UI text out of the code into string resources (the localship-extract skill), on a new branch, then set up translation.",
+            fix: "Move the UI text out of the code into string resources (the localship-extract skill), if the user asks for it.",
           },
     );
   }
   for (const c of chosen) {
     if (c.codeLiterals !== undefined && mostlyHardcoded(c.codeLiterals, c.strings)) {
-      blockers.push({
-        kind: "mostly-hardcoded",
-        message: `About ${c.codeLiterals} pieces of UI text are still in the code, against ${c.strings} in ${c.target.path}. Translating now would leave most of the app in English.`,
-        fix: `First move that text into ${c.target.path}/values/strings.xml on a new branch (the localship-extract skill), building as it goes, then translate.`,
-      });
+      notes.push(
+        `About ${c.codeLiterals} pieces of UI text are still in the code, against ${c.strings} strings in ${c.target.path}. ${EXTRACT}`,
+      );
     }
     if (c.target.format === "xcstrings" && c.strings === 0) {
       blockers.push({
@@ -187,27 +146,12 @@ async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promis
       });
     }
   }
-  if (locales.length === 0) {
-    blockers.push({
-      kind: "no-locales",
-      message: "No languages chosen yet.",
-      fix: "Tell me which languages to translate into (for example: Hindi and Arabic).",
-    });
-  }
+  if (locales.length === 0) blockers.push(noLocales);
 
-  // Text still in the code will be translated too, once it's moved into resources.
-  const strings = chosen.reduce(
-    (n, c) =>
-      n +
-      c.strings +
-      (c.codeLiterals !== undefined && mostlyHardcoded(c.codeLiterals, c.strings)
-        ? c.codeLiterals
-        : 0),
-    0,
-  );
-  const keep = await appNames(fs, path.resolve(cwd), result);
+  const strings = chosen.reduce((n, c) => n + c.strings, 0);
   return build({
     warnings: result.otherSystems.map((o) => o.message),
+    notes,
     configured: false,
     sourceLocale: result.sourceLocale.value,
     locales: locales.map((code) => ({ code, name: languageName(code), isNew: true })),
@@ -218,10 +162,17 @@ async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promis
     })),
     work: Object.fromEntries(locales.map((l) => [l, strings])),
     blockers,
-    keep,
-    hasBrief: false,
+    keep: await appNames(fs, path.resolve(cwd), result),
+    brief: false,
+    voice: () => undefined,
   });
 }
+
+const noLocales: Plan["blockers"][number] = {
+  kind: "no-locales",
+  message: "No languages chosen yet.",
+  fix: "Ask the user which languages to translate into.",
+};
 
 async function planConfigured(project: Project, requested: string[]): Promise<Plan> {
   const configured = projectLocales(project);
@@ -243,22 +194,12 @@ async function planConfigured(project: Project, requested: string[]): Promise<Pl
       );
     }
   }
-  const blockers: Plan["blockers"] = (await hardcodedNotes(project)).map((n) => ({
-    kind: "mostly-hardcoded" as const,
-    message: n.message,
-    fix: "First move that text into strings.xml on a new branch (the localship-extract skill), then translate.",
-  }));
-  if (focus.length === 0) {
-    blockers.push({
-      kind: "no-locales",
-      message: "No languages chosen yet.",
-      fix: "Tell me which languages to translate into.",
-    });
-  }
+  const notes = (await hardcodedNotes(project)).map((n) => `${n.message} ${EXTRACT}`);
   const { files } = await walk(project.fs, project.root);
   const others = await findOtherSystems(project.fs, project.root, files);
   return build({
     warnings: others.map((o) => o.message),
+    notes,
     configured: true,
     sourceLocale: project.config.sourceLocale,
     locales: focus.map((code) => ({
@@ -272,15 +213,18 @@ async function planConfigured(project: Project, requested: string[]): Promise<Pl
       strings: [...t.target.source.entries.values()].filter((e) => e.translatable).length,
     })),
     work,
-    blockers,
-    keep: project.context.glossary.filter((t) => !t.translate).map((t) => t.term),
-    hasBrief: !!project.context.brief,
-    voices: project.context.voice,
+    blockers: focus.length ? [] : [noLocales],
+    keep: projectGlossary(project)
+      .filter((t) => !t.translate)
+      .map((t) => t.term),
+    brief: !!project.context.brief,
+    voice: (l) => voiceFor(project.context, l),
   });
 }
 
 function build(p: {
   warnings: string[];
+  notes: string[];
   configured: boolean;
   sourceLocale: string;
   locales: Plan["locales"];
@@ -288,43 +232,14 @@ function build(p: {
   work: Record<string, number>;
   blockers: Plan["blockers"];
   keep: string[];
-  hasBrief: boolean;
-  voices?: Record<string, string>;
+  brief: boolean;
+  voice: (locale: string) => string | undefined;
 }): Plan {
   const voice = Object.fromEntries(
-    p.locales.map((l) => [l.code, p.voices?.[l.code] ?? defaultVoice(l.code)]),
-  );
-  const fixFirst = p.blockers.filter((b) => b.kind !== "no-locales");
-  const names = p.locales.map((l) => l.name).join(" and ");
-  // Per language: the same strings go into each.
-  const total = Math.max(0, ...Object.values(p.work));
-  const steps: string[] = [];
-  for (const b of fixFirst) steps.push(b.fix);
-  if (!p.configured) {
-    steps.push(
-      `Set up Localship for ${p.targets.map((t) => t.path).join(", ") || "the app"} with ${names || "your languages"} (localship_start).`,
-    );
-  } else if (p.locales.some((l) => l.isNew)) {
-    steps.push(
-      `Add ${p.locales
-        .filter((l) => l.isNew)
-        .map((l) => l.name)
-        .join(" and ")} (localship_start).`,
-    );
-  }
-  if (!p.hasBrief) {
-    steps.push(
-      "Draft a short brief from your README and strings, so translations match the app's tone.",
-    );
-  }
-  const about = fixFirst.some((b) => b.kind === "mostly-hardcoded") ? "about " : "";
-  steps.push(
-    `Translate ${total ? `${about}${total}` : "the"} strings${names ? ` into ${names}` : ""}, checking each one (localship_next_batch → localship_submit until nothing remains).`,
-    "Run all checks (localship_validate) and report what was done.",
-    "Leave everything as drafts for you to review; nothing is approved without you.",
-  );
-  const blocked = p.blockers.some(
-    (b) => b.kind === "unsupported-format" || b.kind === "no-locales",
+    p.locales.map((l) => {
+      const own = p.voice(l.code);
+      return [l.code, { text: own ?? conventionalVoice(l.code), fromProject: !!own }];
+    }),
   );
   return {
     ready: p.blockers.length === 0,
@@ -334,14 +249,11 @@ function build(p: {
     targets: p.targets,
     work: p.work,
     warnings: p.warnings,
+    notes: p.notes,
     blockers: p.blockers,
-    defaults: {
-      voice,
-      keepAsWritten: p.keep,
-      brief: p.hasBrief ? "exists" : "will be drafted",
-    },
-    steps,
-    confirm: blocked ? "" : fixFirst.length ? "start" : "start translating",
+    voice,
+    keepAsWritten: p.keep,
+    brief: p.brief,
   };
 }
 
@@ -349,31 +261,22 @@ export interface StartResult {
   config: string;
   createdConfig: boolean;
   addedLocales: string[];
-  /** Context files written, relative to the context folder. */
-  wrote: string[];
   warnings: string[];
 }
 
 /**
- * Does the setup part of a plan in one call: writes the config (or adds languages to it), and
- * fills in default voice notes and the glossary where none exist. Never overwrites a person's
- * context files. The brief is left to the agent, which can read the README.
+ * Writes the config translation needs (or adds the languages to it), and nothing else: brief,
+ * voice and glossary files are written only when the user asks for them.
  */
 export async function start(
   fs: FileSystem,
   cwd: string,
-  opts: { locales: string[]; voice?: Record<string, string>; keepAsWritten?: string[] },
+  opts: { locales: string[] },
 ): Promise<StartResult> {
   const locales = opts.locales.map(resolveLocale);
   if (locales.length === 0) throw new UserError("Say which languages to translate into");
   const root = path.resolve(cwd);
-  const result: StartResult = {
-    config: "",
-    createdConfig: false,
-    addedLocales: [],
-    wrote: [],
-    warnings: [],
-  };
+  const result: StartResult = { config: "", createdConfig: false, addedLocales: [], warnings: [] };
 
   let existing: string | undefined;
   try {
@@ -384,42 +287,23 @@ export async function start(
   if (existing) {
     result.config = existing;
     result.addedLocales = (await addLocales(fs, existing, locales)).added;
-  } else {
-    const out: string[] = [];
-    const code = await runInit(
-      fs,
-      { cwd: root, yes: true, locales },
-      {
-        interactive: false,
-        log: (l) => out.push(l),
-        error: (l) => out.push(l),
-        ask: async (_q, f) => f,
-      },
-    );
-    if (code !== 0) throw new UserError(out.join("\n"));
-    result.config = path.join(root, CONFIG_FILE);
-    result.createdConfig = true;
-    result.addedLocales = locales;
-    result.warnings = out.filter((l) => l.startsWith("▲ ")).map((l) => l.slice(2));
+    return result;
   }
-
-  const project = await openProject(fs, { cwd: root });
-  const dir = project.context.dir;
-  const write = async (rel: string, content: string) => {
-    const file = path.join(dir, rel);
-    if (await fs.exists(file)) return;
-    await fs.writeFile(file, content.endsWith("\n") ? content : `${content}\n`);
-    result.wrote.push(rel);
-  };
-  for (const l of projectLocales(project)) {
-    await write(`${CONTEXT_FILES.voiceDir}/${l}.md`, opts.voice?.[l] ?? defaultVoice(l));
-  }
-  const keep = opts.keepAsWritten ?? (await appNames(fs, root, await detect(fs, root)));
-  if (keep.length) {
-    await write(
-      CONTEXT_FILES.glossary,
-      toYaml({ terms: keep.map((term) => ({ term, translate: false })) }, { lineWidth: 0 }),
-    );
-  }
+  const out: string[] = [];
+  const code = await runInit(
+    fs,
+    { cwd: root, yes: true, locales },
+    {
+      interactive: false,
+      log: (l) => out.push(l),
+      error: (l) => out.push(l),
+      ask: async (_q, f) => f,
+    },
+  );
+  if (code !== 0) throw new UserError(out.join("\n"));
+  result.config = path.join(root, CONFIG_FILE);
+  result.createdConfig = true;
+  result.addedLocales = locales;
+  result.warnings = out.filter((l) => l.startsWith("▲ ")).map((l) => l.slice(2));
   return result;
 }
