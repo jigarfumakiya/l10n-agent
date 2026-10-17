@@ -1,6 +1,6 @@
 {
   "name": "localship",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Translate your app with the AI you already use. An MCP server, agent skills and CLI that check every translation before it's written. Android, Apple String Catalogs and gettext.",
   "keywords": [
     "localization",

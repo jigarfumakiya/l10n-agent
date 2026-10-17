@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - Agents do what was asked and nothing more. `plan` is now a read-only look with no confirm
   phrase; agents stop only for blockers or another tool managing translations. Text still in
-  the code is a note, not a blocker: it's moved only when the user asks. No branches, commits,
+  the code is a note, not a blocker. No branches, commits,
   or brief, voice and glossary files unless asked; `start` writes only the config. The model API
   (`translate --model`) is used only when the user asks for it.
 - Agents go by what the user means, however it's worded: wanting the app in a language moves
@@ -48,6 +48,7 @@
 
 - Consistency: a translation with a note is worded differently on purpose ("Delete account" for
   a sign-in account and for a budget), so `validate` and `submit` no longer flag it.
+- Windows: atomic writes retry briefly when the target file is busy.
 
 ## 0.2.0
 
