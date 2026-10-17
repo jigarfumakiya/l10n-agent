@@ -22,11 +22,12 @@ src/detect/      repo walk, per-format detection, config building for `init`
 src/translate/   prompts, model providers, the delegated translate loop
 src/mcp/         the MCP server
 src/cli/         the `localship` command
-skills/          agent skills: localship-setup, localship-extract, localship-translate, localship-review
+skills/          agent skills: localship (handles requests), localship-setup, localship-extract, localship-translate, localship-review
 docs/            the reference
 .claude-plugin/  Claude Code plugin and marketplace manifests
 examples/        a sample app translated with the tool
 fixtures/        sample projects with deliberate mistakes, one per format
+benchmarks/      a synthetic performance check (`npm run benchmark`)
 test/            vitest suites
 ```
 
@@ -54,7 +55,10 @@ a fixture with deliberate mistakes in `fixtures/`.
 
 ## Before a pull request
 
-For performance changes, see [performance checks](docs/performance.md) for the benchmark's scope
-and repeatable comparison procedure.
+For performance changes, run `npm run benchmark` (2,000 strings per target, or
+`npm run benchmark -- 10000`) before and after. It builds temporary Android and String Catalog
+projects with eight locales and times loading, batching, validation, a dry-run submission and
+plural lookups, with no model calls. Single runs are noisy: compare several fresh runs on the same
+machine and Node version. CI has no timing thresholds.
 
 `npm run check` must pass (typecheck, lint, tests). CI runs it on Linux, macOS and Windows.

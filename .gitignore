@@ -2,4 +2,18 @@ node_modules/
 dist/
 coverage/
 *.log
+*.tgz
+*.tmp
 .DS_Store
+
+# API keys for `localship translate --model` belong in the environment, never in git.
+.env
+.env.*
+
+# A lock left behind if a Localship write crashed (in examples or test projects).
+**/.localship/write.lock
+
+# Personal editor and agent settings.
+.vscode/
+.idea/
+.claude/settings.local.json

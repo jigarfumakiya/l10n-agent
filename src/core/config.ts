@@ -9,10 +9,8 @@ import { PLACEHOLDER_SYNTAXES } from "./placeholders.js";
 export const CONFIG_FILE = ".localship/config.yaml";
 /** Where the config lived before it moved into the folder; still read. */
 export const ROOT_CONFIG_FILE = "localship.yaml";
-/** The name before the project was called Localship; still read, with its `.l10n` folder. */
-export const LEGACY_CONFIG_FILE = "l10n.config.yaml";
 /** Config files Localship reads, in order of preference. */
-export const CONFIG_FILES = [CONFIG_FILE, ROOT_CONFIG_FILE, LEGACY_CONFIG_FILE];
+export const CONFIG_FILES = [CONFIG_FILE, ROOT_CONFIG_FILE];
 
 /** The directory paths in a config are relative to: the repo root, not the `.localship` folder. */
 export function configRoot(file: string): string {
@@ -210,9 +208,6 @@ export async function loadConfig(
     raw = parseYaml(await fs.readFile(file));
   } catch (e) {
     throw new ConfigError(`${file}: ${(e as Error).message}`);
-  }
-  if (path.basename(file) === LEGACY_CONFIG_FILE && raw && typeof raw === "object") {
-    raw = { lock: ".l10n/lock.json", context: ".l10n", ...raw };
   }
   const parsed = ConfigSchema.safeParse(raw ?? {});
   if (!parsed.success) {

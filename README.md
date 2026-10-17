@@ -57,9 +57,6 @@ no server, no monthly bill.
 | Changed copy | Everything redone | Only what changed |
 | Your edits | Overwritten | Kept |
 
-For a comparison with Lingo.dev, Crowdin, Lokalise and i18n Ally, see the
-[plugin review](docs/plugin-review.md).
-
 ## 🎬 See it in action
 
 ```

@@ -82,15 +82,3 @@ describe("addLocales", () => {
     await expect(addLocales(fs, "/a/localship.yaml", ["not a code"])).rejects.toThrow(ConfigError);
   });
 });
-
-describe("legacy config name", () => {
-  it("still reads l10n.config.yaml, keeping its .l10n folder", async () => {
-    const fs = memoryFs({
-      "/old/l10n.config.yaml": "targets:\n  - format: po\n    path: po/{locale}.po\n",
-    });
-    const { config, file } = await loadConfig(fs, "/old");
-    expect(path.basename(file)).toBe("l10n.config.yaml");
-    expect(config.lock).toBe(".l10n/lock.json");
-    expect(config.context).toBe(".l10n");
-  });
-});

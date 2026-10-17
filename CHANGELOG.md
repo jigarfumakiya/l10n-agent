@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The pre-release config name `l10n.config.yaml` (with its `.l10n` folder) is no longer read;
+  use `.localship/config.yaml`.
+
 ## 0.3.0
 
 - Agents do what was asked and nothing more. `plan` is now a read-only look with no confirm
