@@ -157,6 +157,23 @@ describe("xcstrings adapter", async () => {
     expect(out.endsWith('"version" : "1.0"\n}')).toBe(true);
   });
 
+  it("skips keys with no words, from text built in pieces", async () => {
+    const keys = [" ", "·", "%@%@", " %@ ", "—", "%lld", "%lld items", "Done"];
+    const fs = memoryFs({
+      "/a/localship.yaml": "targets:\n  - format: xcstrings\n    path: L.xcstrings\n",
+      "/a/L.xcstrings": JSON.stringify({
+        sourceLanguage: "en",
+        strings: Object.fromEntries(keys.map((k) => [k, {}])),
+        version: "1.0",
+      }),
+    });
+    const t = (await openProject(fs, { cwd: "/a" })).targets[0]?.target;
+    const translatable = [...(t?.source.entries.values() ?? [])]
+      .filter((e) => e.translatable)
+      .map((e) => e.key);
+    expect(translatable).toEqual(["%lld items", "Done"]);
+  });
+
   it("adds localizations to an entry that had none", async () => {
     const fs = memoryFs({
       "/a/localship.yaml": "targets:\n  - format: xcstrings\n    path: L.xcstrings\n",

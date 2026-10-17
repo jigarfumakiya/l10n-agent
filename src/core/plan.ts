@@ -142,7 +142,7 @@ async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promis
       blockers.push({
         kind: "empty-catalog",
         message: `${c.target.path} is empty.`,
-        fix: "Build the app in Xcode once so it collects your strings into the catalog.",
+        fix: "Build the targets that use it, then fill it: Xcode's catalog editor does this with the project open; from the command line, run `xcrun xcstringstool sync <catalog> --stringsdata <each target's .stringsdata in DerivedData>`, since a command-line build alone leaves the catalog unchanged.",
       });
     }
   }

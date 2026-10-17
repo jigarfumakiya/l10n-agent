@@ -29,6 +29,9 @@ Official references:
 - Use the actual development language, correct table/bundle, and compiler extraction. Build
   relevant targets and platforms before treating catalogs as complete; include extensions,
   packages, Info.plist text and interface resources used by the app.
+- Command-line builds write `.stringsdata` but don't update catalogs; sync them with
+  `xcrun xcstringstool sync`. In XcodeGen or Tuist projects, make localization settings in
+  `project.yml` or `Project.swift`, since regenerating drops changes made in Xcode.
 - Keep device variants and substitutions intact. Localship currently models plain strings and
   one level of plural string units. Advanced entries remain in the catalog but block strict
   completeness checks. Handle them in Xcode and report that Localship cannot certify the whole

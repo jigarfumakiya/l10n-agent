@@ -30,7 +30,7 @@ pick the case that fits:
 | A warning that most of the app's text is still in the code (more UI text in code than strings in resources) | **C. Text is hardcoded**, even if a few strings exist: tell the user how much is in code; translations cover only what's in resources until it's moved (the `localship-extract` skill, if they ask) |
 | Setups with existing languages (`hi, ar` …) | **A. Already localized** |
 | Setups with strings but no languages | **B. Ready to translate** |
-| An empty String Catalog (0 strings) | Check compiler extraction and target membership; build relevant targets and platforms, then detect again |
+| An empty String Catalog (0 strings) | Check compiler extraction and target membership, build the relevant targets and platforms, and sync the catalog from the build (`xcrun xcstringstool sync`; a command-line build alone leaves it empty, see `localship-extract`), then detect again |
 | A gettext template with no translations | **B**, after confirming where new `.po` files go (detect suggests a path) |
 | Nothing, with a hint about Android or Xcode | **C. Text is hardcoded**: nothing to set up until the text is in resources; the `localship-extract` skill moves it, if the user asks |
 | Only formats listed as "not supported yet" (Flutter ARB, JSON, `.strings` …) | Say so plainly; Localship can't translate those yet |

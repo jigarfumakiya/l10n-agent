@@ -175,15 +175,17 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
           line,
         });
       }
+      const own = read(locs[sourceLanguage]);
       const base: Omit<Entry, "message"> = {
         key,
         // "" is Xcode's placeholder for empty Text(""); stale strings are gone from the code.
-        translatable: intended && !variant,
+        // Keys with no words (" ", "·", "%@%@") come from text built in pieces: nothing to translate.
+        translatable:
+          intended && !variant && hasWords(own?.message ?? { kind: "text", value: key }),
         file: rel,
         line,
       };
       if (info.comment) base.comment = info.comment;
-      const own = read(locs[sourceLanguage]);
       source.entries.set(key, { ...base, message: own?.message ?? { kind: "text", value: key } });
 
       // Skipped strings (unsupported variations, stale, shouldTranslate false) keep their
@@ -291,4 +293,18 @@ function sortDeep(v: unknown): unknown {
       .sort(order)
       .map((k) => [k, sortDeep((v as Record<string, unknown>)[k])]),
   );
+}
+
+const FORMAT_SPECIFIER =
+  /%(?:\d+\$)?[-+ #0]*\d*(?:\.\d+)?(?:hh|h|ll|l|q|z|t|j)?[@dDuUxXoOfFeEgGcCsSpaA%]/g;
+
+/** Whether a message has any letters once format specifiers are removed. */
+function hasWords(message: Message): boolean {
+  const values =
+    message.kind === "text"
+      ? [message.value]
+      : message.kind === "plural"
+        ? Object.values(message.forms)
+        : message.items;
+  return values.some((v) => /\p{L}/u.test(v.replace(FORMAT_SPECIFIER, "")));
 }

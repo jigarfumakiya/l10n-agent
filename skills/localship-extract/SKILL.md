@@ -31,11 +31,32 @@ much you found, and start. Build as you go, and give a short progress update aft
   `alert`/`confirmationDialog` text passed as `String`, `Button(title)` with a `String`
 - UIKit: `label.text = "…"`, `button.setTitle("…", for:)`, `title = "…"`
 - notification content, widget text, App Intents titles
+- default UI text in parameters (`title: String = "Cancel"`): not extracted until the parameter
+  is a `LocalizedStringResource` or the default is wrapped
+
+**Sentences built from English grammar** (both platforms). Wrapping these in a resource does
+nothing; search for them and rewrite each sentence whole:
+- pieces joined around a value (`"Finished " + amount + " over your plan."`, often so the value
+  can be styled): one complete sentence per case with placeholders, styling the value inside it
+  (`AttributedString(localized:)`; Android annotations or spans on the placeholder)
+- plural endings in code (`count == 1 ? "" : "s"`, `== 1 ?` near text): plural resources
+- helpers that spell out numbers, write ordinals or choose "a"/"an" (names with `spell`,
+  `ordinal`, `article`): formatters (`.formatted(.number.notation(.spellOut))`, an ordinal
+  `NumberFormatter`; ICU `RuleBasedNumberFormat` and `MessageFormat` on Android) or one sentence
+  per case
+- text surgery on UI strings (`replacingOccurrences`, `replace`, `removePrefix`): store both forms
+- lists (`joined(separator: ", ")` plus "and"): `.formatted(.list(type: .and))`,
+  `ListFormatter`, or ICU `ListFormatter` on Android
+
+Rewrite even when it adds variants, and keep the English output identical so tests still pass.
 
 **Leave alone:** log messages, analytics event names, preference and database keys, routes and
 deep links, test tags and accessibility identifiers, URLs, format patterns, debug-only screens,
-and anything never shown to users. Brand names can stay in code, or become resources marked
-not translatable.
+and anything never shown to users. Also text that doubles as data: enum raw values, `case`
+patterns, query item names, dictionary keys, and any string that's parsed back, compared or saved
+(picker values parsed into intervals, values written to export files). To show those translated,
+add a separate display property and keep the stored value as it is. Brand names can stay in code,
+or become resources marked not translatable.
 
 ## 2. Android rules
 
@@ -71,6 +92,14 @@ not translatable.
 
 ## 3. iOS rules
 
+- **Generated projects:** when `project.yml` (XcodeGen) or `Project.swift` (Tuist) exists, make
+  every project change there and regenerate; never edit the `.pbxproj` or rely on changes made in
+  Xcode, which regeneration drops. In XcodeGen that's `options: developmentLanguage: <lang>` and,
+  under `settings: base:`, `SWIFT_EMIT_LOC_STRINGS: YES` and
+  `LOCALIZATION_PREFERS_STRING_CATALOGS: YES`, with each catalog inside a source folder of its
+  target.
+- Every target that shows text (the app, widgets and other extensions) needs its own catalog in
+  its sources.
 - Use String Catalogs and the project's actual development language; never assume English.
   Reuse existing tables. For a new catalog, use Xcode's localization preparation tools when
   available, or create `Localizable.xcstrings` in the appropriate target with `sourceLanguage`
@@ -79,6 +108,19 @@ not translatable.
 - Verify **Use Compiler to Extract Swift Strings** (`SWIFT_EMIT_LOC_STRINGS`) for the relevant
   targets. Build all relevant schemes/targets and supported platforms before translating;
   building only the main app may miss platform-conditional strings and extension resources.
+- **Filling the catalog:** a command-line build (`xcodebuild`) writes `.stringsdata` files into
+  DerivedData but leaves the `.xcstrings` unchanged; only Xcode's catalog editor merges them. An
+  empty catalog after a clean build doesn't mean extraction failed. Sync each catalog from its
+  own target's build output:
+  ```sh
+  xcrun xcstringstool sync <Target>/Localizable.xcstrings \
+    --stringsdata <DerivedData>/Build/Intermediates.noindex/<Project>.build/<Config>-<sdk>/<Target>.build/Objects-normal/*/*.stringsdata
+  ```
+- **Keys with no words** (`" "`, `"·"`, `"%@%@"`, `"—"`) come from text built in pieces.
+  Localship skips them; mark them `"shouldTranslate" : false` in the catalog so Xcode's progress
+  agrees, and check whether each one is a sentence split into pieces that should be rewritten.
+- For copy-heavy models (personalities, tips, onboarding pages), changing an initializer
+  parameter from `String` to `LocalizedStringResource` extracts all the copy passed to it.
 - `Text("literal")`, `Button("literal")`, `Label("literal", …)` are extracted by Xcode
   automatically. Add a comment where the meaning isn't obvious: `Text("Save", comment: "Saves the profile")`.
 - Prefer `LocalizedStringResource` for passing localizable text through models and custom views;
@@ -92,7 +134,10 @@ not translatable.
   review generated comments and add app-specific meaning and placeholder context.
 - Use `Text(verbatim:)` for text that must never be translated (codes, user content).
 - Interpolations become placeholders automatically: `Text("\(count) items")` → key `%lld items`.
-  Counts need plural forms: use the catalog's **Vary by Plural** or available Xcode tools.
+  Counts need plural forms: after syncing, find the keys with count placeholders (`%lld`,
+  `%d`) and give them plural variations (**Vary by Plural** in Xcode, or `variations.plural` in
+  the catalog JSON with the forms the source language needs). Whatever you can't convert, list
+  in your report so the user can do it in Xcode before translating.
   Multiple independent counts require substitutions; device wording may require device variants.
   Localship cannot translate or validate those advanced entries yet. Keep their structure and
   use Xcode to handle them; never flatten them to make Localship's checks pass.
@@ -112,7 +157,9 @@ not translatable.
   switch the device to "English (XA)", and look for text that isn't accented: that text is still hardcoded.
   "AR (XB)" shows right-to-left layout problems.
 - iOS: Scheme › Run › Options › App Language › "Accented Pseudolanguage" (and "Right-to-Left
-  Pseudolanguage"). Plain English left over was missed.
+  Pseudolanguage"). Plain English left over was missed. Without Xcode's UI, a scripted check works:
+  add a temporary language whose values wrap the English in markers (`⟦Save⟧`), launch with
+  `-AppleLanguages "(xx)"`, look for text without markers, then remove the temporary language.
 - If you can't run these, list the screens for the user to check.
 
 ### Text the resource files can't show
@@ -123,6 +170,9 @@ for them while you're in it:
 - **Names stored in data.** Categories, accounts or templates seeded in English and saved to a
   database are shown as stored. Translate them at display time while they're still the seeded
   value (a map from seeded name to string resource); never translate what the user typed.
+  Use the translated name only for showing it: anything saved (database rows, defaults,
+  exports, a name copied into a new record) keeps the stored value, or it stays in whatever
+  language the app had when it was saved.
 - **Text built once and kept.** View models, singletons and caches that build sentences keep the
   old language after an in-app language switch. Rebuild them when the locale changes; on Android,
   view models survive the activity being recreated for the new language.

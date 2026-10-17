@@ -11,6 +11,13 @@
   text still in the code into string resources and then translates; keeping translations up to
   date translates only; a limit the user states wins. A missing language is asked once, before
   any work. Skills no longer run `git status`.
+- iOS extraction: the skill covers XcodeGen/Tuist projects, filling catalogs after a
+  command-line build (`xcrun xcstringstool sync`), a catalog per target, sentences built from
+  English grammar, text that doubles as data, plural keys and a scripted leftover-English check.
+  `detect` names the project generator and says how to fill an empty catalog. Catalog keys with
+  no words (`" "`, `"·"`, `"%@%@"`) are skipped instead of sent for translation.
+- Extraction: a seeded name translated for display is never saved back; records, defaults and
+  exports keep the stored value.
 - Batches carry `defaultVoice`, the usual formality for a language with no voice file, and keep
   the Android app name as written when the glossary doesn't mention it, without writing either
   to a file. European Portuguese no longer gets Brazilian conventions.

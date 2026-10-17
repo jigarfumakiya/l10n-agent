@@ -55,7 +55,7 @@ describe("detect", () => {
       [{ format: "po", path: "po/{locale}.po", template: "po/app.pot" }, "medium", 2],
       [{ format: "xcstrings", path: "App/Localizable.xcstrings" }, "medium", 0],
     ]);
-    expect(r.candidates[1]?.questions[0]).toMatch(/Build the app in Xcode/);
+    expect(r.candidates[1]?.questions[0]).toMatch(/xcstringstool sync/);
   });
 
   it("finds Android modules and skips tests, build output and resource-only folders", async () => {
@@ -153,6 +153,17 @@ describe("detect", () => {
     const r = await detect(fs, "/r");
     expect(r.candidates).toEqual([]);
     expect(r.hints[0]).toMatch(/String Catalog/);
+    expect(r.hints[0]).toMatch(/Add one in Xcode/);
+  });
+
+  it("says where the catalog goes when XcodeGen generates the project", async () => {
+    const fs = memoryFs({
+      "/r/project.yml": "name: App",
+      "/r/App/ContentView.swift": "",
+    });
+    const r = await detect(fs, "/r");
+    expect(r.hints[0]).toMatch(/XcodeGen \(project\.yml\).*each target's sources.*regenerate/);
+    expect(r.hints[0]).not.toMatch(/Add one in Xcode/);
   });
 });
 
