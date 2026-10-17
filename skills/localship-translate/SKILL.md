@@ -1,6 +1,6 @@
 ---
 name: localship-translate
-description: Translate an app's missing or changed strings with Localship — fetch batches with context, translate them, submit them for checks, and fix what's rejected until nothing is left. Use when the user asks to translate, localize, add a language, or update translations after copy changes.
+description: Translate an app's missing or changed strings with Localship — fetch batches with context, translate them, submit them for checks, and fix what's rejected until nothing is left. Use for the translating itself, once the text is in string resources; for a request to localize the app or add a language, start with the localship skill, which works out whether text has to be moved first.
 ---
 
 # Translate with Localship
@@ -19,7 +19,6 @@ You translate. Don't edit translation files by hand.
   `npm install -g localship`.
 - No `.localship/config.yaml`? Run the `localship-setup` skill first.
 - A language that isn't configured yet: `localship add-locale <code>` first.
-- Check `git status` first and mention uncommitted changes, so the translation diff stays reviewable.
 
 ## 1. Size up the work
 

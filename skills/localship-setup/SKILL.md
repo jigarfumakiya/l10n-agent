@@ -19,9 +19,6 @@ that need judgment: choosing what to set up, and writing the context translators
   `npm install -g localship` (running it through `npx` every time is slow).
 - Add `--json` when you need to read the output.
 
-Before writing anything, check `git status`. If there are uncommitted changes, mention it, so the
-user can tell your changes apart from theirs.
-
 ## 1. Find out where the project stands
 
 Run `localship status`. If it works, the project is already set up (if it warns that most text is still in the code, go to case C): go to step 5 (context) if

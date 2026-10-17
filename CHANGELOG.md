@@ -7,6 +7,10 @@
   the code is a note, not a blocker: it's moved only when the user asks. No branches, commits,
   or brief, voice and glossary files unless asked; `start` writes only the config. The model API
   (`translate --model`) is used only when the user asks for it.
+- Agents go by what the user means, however it's worded: wanting the app in a language moves
+  text still in the code into string resources and then translates; keeping translations up to
+  date translates only; a limit the user states wins. A missing language is asked once, before
+  any work. Skills no longer run `git status`.
 - Batches carry `defaultVoice`, the usual formality for a language with no voice file, and keep
   the Android app name as written when the glossary doesn't mention it, without writing either
   to a file. European Portuguese no longer gets Brazilian conventions.

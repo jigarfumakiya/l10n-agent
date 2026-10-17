@@ -1,6 +1,6 @@
 ---
 name: localship-extract
-description: Make an Android or iOS app localizable by moving text hardcoded in Kotlin, XML layouts or Swift into string resources or a String Catalog, without changing behavior. Use when an app has no translation files yet, when localship detect finds nothing, or when the user asks to find hardcoded strings.
+description: Make an Android or iOS app localizable by moving text hardcoded in Kotlin, XML layouts or Swift into string resources or a String Catalog, without changing behavior. Use when the user wants text ready for translation or hardcoded strings found, however they phrase it, and as the first step when they want the app in another language but its text is still in the code.
 ---
 
 # Make an app localizable
@@ -14,8 +14,7 @@ the rules below keep it safe. Change how text is looked up, never what the app d
 `localship detect` (or `localship_detect`) gives a first estimate: how much UI text is still in the
 code, per module, with examples. Use it to size the work, then search properly as below.
 
-Do the scope the user asked for: the whole app for "make the app localizable", or just the
-screens or features they named. Search that code for user-facing literals, say in one line how
+Do the scope the user wants: the whole app unless they named particular screens or features. Search that code for user-facing literals, say in one line how
 much you found, and start. Build as you go, and give a short progress update after each part.
 
 **Android (Kotlin, Compose, Views)**, look for string literals in:

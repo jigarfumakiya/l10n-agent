@@ -30,7 +30,7 @@ export interface Plan {
   work: Record<string, number>;
   /** Another tool already manages translations: ask the user before writing any. */
   warnings: string[];
-  /** Worth telling the user, but nothing to act on unless they ask (text still in the code…). */
+  /** Text still in the code: moved when the user wants the app in a language, else only mentioned. */
   notes: string[];
   /** What stops translation, and what would get past it. */
   blockers: Array<{ kind: Blocker; message: string; fix: string }>;
@@ -106,7 +106,7 @@ export async function plan(fs: FileSystem, cwd: string, opts: PlanOptions = {}):
 }
 
 const EXTRACT =
-  "They won't be translated until they're moved into string resources (the localship-extract skill, when the user asks for it).";
+  "They won't be translated until they're moved into string resources (the localship-extract skill): part of making the app work in a language, otherwise only when the user asks.";
 
 async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promise<Plan> {
   const result = await detect(fs, path.resolve(cwd));
@@ -128,7 +128,7 @@ async function planNew(fs: FileSystem, cwd: string, requested: string[]): Promis
         : {
             kind: "no-translation-files",
             message: `No translation files yet. ${result.hints[0] ?? ""}`.trim(),
-            fix: "Move the UI text out of the code into string resources (the localship-extract skill), if the user asks for it.",
+            fix: "Move the UI text out of the code into string resources (the localship-extract skill): part of making the app work in a language, otherwise only when the user asks.",
           },
     );
   }
