@@ -33,7 +33,7 @@ pick the case that fits:
 | A warning that most of the app's text is still in the code (more UI text in code than strings in resources) | **C. Text is hardcoded**, even if a few strings exist: run `localship-extract` first, or translations will cover only part of the app. Tell the user how much is in code |
 | Setups with existing languages (`hi, ar` …) | **A. Already localized** |
 | Setups with strings but no languages | **B. Ready to translate** |
-| An empty String Catalog (0 strings) | Ask the user to build the app in Xcode once, then detect again |
+| An empty String Catalog (0 strings) | Check compiler extraction and target membership; build relevant targets and platforms, then detect again |
 | A gettext template with no translations | **B**, after confirming where new `.po` files go (detect suggests a path) |
 | Nothing, with a hint about Android or Xcode | **C. Text is hardcoded**: run the `localship-extract` skill first, then come back |
 | Only formats listed as "not supported yet" (Flutter ARB, JSON, `.strings` …) | Say so plainly; Localship can't translate those yet |
@@ -60,10 +60,26 @@ plurals). Report the errors and offer to fix them.
 
 ## 4. Platform setup the tool can't do (mention what applies)
 
-- Android: per-app language picker — in `build.gradle(.kts)` set
-  `androidResources { generateLocaleConfig = true }` and add
-  `app/src/main/res/resources.properties` with `unqualifiedResLocale=en-US` (the source).
-- iOS: add each language under Project › Info › Localizations so Xcode keeps them.
+- Android: inspect AGP, compileSdk and any existing language configuration first. Automatic
+  `androidResources { generateLocaleConfig = true }` needs AGP 8.1+ and compileSdk 33+.
+  Set `unqualifiedResLocale` in the app module's `res/resources.properties` to the actual
+  default locale, not an assumed `en-US`. Do not combine a manual LocaleConfig with generation;
+  reconcile the existing setup. Check the generated supported-language list, including library
+  resources, and restrict it to languages ready for release using the installed AGP's supported
+  locale-filter configuration.
+- Android in-app selection: integrate platform `LocaleManager` on Android 13+ or compatible
+  AndroidX `AppCompatDelegate.setApplicationLocales`; consider the Activity/context requirements
+  on older devices, persisted preferences and migration from any existing picker. Test system
+  settings, app settings, restart and configuration changes together. Generating LocaleConfig
+  alone does not implement a backward-compatible picker.
+- iOS: add languages through the catalog/project localization settings or available Xcode
+  preparation tools. Check the development language, resource bundles, compiler extraction and
+  all relevant targets/platforms, as described in `localship-extract`. Xcode 27's native agent
+  tools can assist preparation; use them when available, with the project's glossary and voice.
+
+Read [platform verification](../localship-extract/references/platform-localization.md) for the
+official references. Report unsupported catalog/resource configurations before translating;
+strict validation blocks them even when supported strings are all complete.
 
 ## 5. Write the context
 
@@ -93,7 +109,8 @@ Without file access, use `localship_update_context` instead.
 ## Cleaning up
 
 After strings are deleted or renamed, `localship prune --dry-run` shows leftover translations; show
-the user, then run `localship prune`.
+the user, then run `localship prune`. First verify that the source keys were actually removed:
+a missing Android default can look like a leftover translation, and should be restored instead.
 
 ## Adding languages later
 

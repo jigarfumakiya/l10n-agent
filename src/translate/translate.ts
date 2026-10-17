@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { UserError } from "../core/errors.js";
 import { type Project, projectLocales, reopenProject } from "../core/project.js";
 import type { EntryState } from "../core/status.js";
@@ -22,6 +23,10 @@ export interface TranslateOptions {
   model?: string;
   /** Entries per model call. */
   batchSize?: number;
+  /** UTF-8 bytes of system + user prompt, including retry feedback. Default 48000. */
+  maxPromptBytes?: number;
+  timeoutMs?: number;
+  signal?: AbortSignal;
   /** Model calls in flight at once. */
   concurrency?: number;
   /** Replace hand edits and reviewed or approved translations (with states that include them). */
@@ -64,16 +69,44 @@ export async function translateProject(
   start: Project,
   opts: TranslateOptions = {},
 ): Promise<TranslateResult> {
+  const controller = new AbortController();
+  const signal = opts.signal
+    ? AbortSignal.any([opts.signal, controller.signal])
+    : controller.signal;
+  try {
+    return await runTranslation(start, { ...opts, signal });
+  } finally {
+    // Stop sibling requests when one fails, and release their network resources.
+    controller.abort();
+  }
+}
+
+async function runTranslation(start: Project, opts: TranslateOptions): Promise<TranslateResult> {
+  const checkCancelled = () => {
+    if (opts.signal?.aborted) throw new UserError("Translation cancelled");
+  };
+  checkCancelled();
   const log = opts.log ?? (() => {});
   const locales = opts.locales ?? projectLocales(start);
   if (locales.length === 0)
     throw new UserError("No locales to translate. Add `locales:` to the config.");
   const batchSize = opts.batchSize ?? 30;
-  const concurrency = Math.max(1, opts.concurrency ?? 4);
-  const maxAttempts = Math.max(1, opts.attempts ?? 2);
+  const concurrency = opts.concurrency ?? 4;
+  const maxAttempts = opts.attempts ?? 2;
+  const maxPromptBytes = opts.maxPromptBytes ?? 48_000;
+  for (const [name, value] of Object.entries({
+    batchSize,
+    concurrency,
+    attempts: maxAttempts,
+    maxPromptBytes,
+  })) {
+    if (!Number.isSafeInteger(value) || value < 1)
+      throw new UserError(`${name} must be a positive integer`);
+  }
   const makeCompletion =
     opts.completion ??
-    ((model: string) => createCompletion(model, { custom: start.config.providers }));
+    ((model: string) =>
+      createCompletion(model, { custom: start.config.providers, timeoutMs: opts.timeoutMs }));
 
   const models = Object.fromEntries(locales.map((l) => [l, modelFor(start, l, opts.model)]));
   const clients = new Map<string, Complete>();
@@ -97,13 +130,16 @@ export async function translateProject(
   const files = new Set<string>();
   const tries = new Map<string, RetryInfo & { count: number; item: BatchItem }>();
   const givenUp = new Set<string>();
+  // Completed entries may still match opts.states (for example, draft).
+  const finished = new Set<string>();
   let project = start;
   // Code doesn't change during a run; index it once.
   const usages = await buildUsageIndex(start);
 
   for (;;) {
+    checkCancelled();
     // Plan a round: up to `concurrency` batches, never two holding the same entry.
-    const round: Batch[] = [];
+    const round: Array<{ batch: Batch; user: string }> = [];
     for (const locale of locales) {
       let offset = 0;
       while (round.length < concurrency) {
@@ -114,12 +150,28 @@ export async function translateProject(
           states: opts.states,
           limit: batchSize,
           offset,
-          skip: givenUp,
+          skip: finished,
           usages,
           skipHandEdited: !opts.force,
         });
         if (batch.items.length === 0) break;
-        round.push(batch);
+        const retries = new Map<BatchItem, RetryInfo>();
+        for (const item of batch.items) {
+          const retry = tries.get(itemId(item));
+          if (retry) retries.set(item, { value: retry.value, errors: retry.errors });
+        }
+        let user = userPrompt(batch, retries);
+        while (Buffer.byteLength(systemPrompt()) + Buffer.byteLength(user) > maxPromptBytes) {
+          if (batch.items.length === 1) {
+            const item = batch.items[0] as BatchItem;
+            throw new UserError(
+              `Prompt for ${item.locale}:${item.key} exceeds maxPromptBytes (${maxPromptBytes}); shorten context or increase --max-prompt-bytes`,
+            );
+          }
+          batch.items.pop();
+          user = userPrompt(batch, retries);
+        }
+        round.push({ batch, user });
         offset += batch.items.length;
       }
       if (round.length >= concurrency) break;
@@ -127,22 +179,14 @@ export async function translateProject(
     if (round.length === 0) break;
 
     const replies = await Promise.all(
-      round.map(async (batch) => {
+      round.map(async ({ batch, user }) => {
         const locale = batch.items[0]?.locale as string;
         const model = models[locale] as string;
-        const retries = new Map<BatchItem, RetryInfo>();
-        for (const item of batch.items) {
-          const t = tries.get(itemId(item));
-          if (t)
-            retries.set(item, {
-              ...(t.value !== undefined ? { value: t.value } : {}),
-              errors: t.errors,
-            });
-        }
         log(`${locale}: translating ${batch.items.length} strings with ${model}…`);
         try {
-          const reply = await callWithRetry(() =>
-            client(model)({ system: systemPrompt(), user: userPrompt(batch, retries) }),
+          const reply = await callWithRetry(
+            () => client(model)({ system: systemPrompt(), user, signal: opts.signal }),
+            opts.signal,
           );
           return { batch, model, reply };
         } catch (e) {
@@ -153,12 +197,16 @@ export async function translateProject(
     );
 
     for (const { batch, model, reply, error } of replies) {
+      checkCancelled();
       const byId = new Map(batch.items.map((i) => [itemId(i), i]));
       const fail = (item: BatchItem, errors: string[], value?: BatchItem["source"]) => {
         const id = itemId(item);
         const count = (tries.get(id)?.count ?? 0) + 1;
         tries.set(id, { count, errors, item, ...(value !== undefined ? { value } : {}) });
-        if (count >= maxAttempts) givenUp.add(id);
+        if (count >= maxAttempts) {
+          givenUp.add(id);
+          finished.add(id);
+        }
       };
       if (error !== undefined) {
         // An unreachable provider fails every round the same way; stop instead of spinning.
@@ -200,12 +248,20 @@ export async function translateProject(
       const r = await submit(
         project,
         answers.map((a) => a.sub),
-        { model, force: opts.force },
+        {
+          model,
+          force: opts.force,
+          usages,
+          expectedSources: new Map(batch.items.map((item) => [itemId(item), item.source])),
+        },
       );
       for (const f of r.files) files.add(f);
       result.translated += r.accepted.length;
       const accepted = new Set(r.accepted.map((a) => itemId(a)));
-      for (const id of accepted) tries.delete(id);
+      for (const id of accepted) {
+        tries.delete(id);
+        finished.add(id);
+      }
       for (const { item, sub } of answers) {
         const id = itemId(item);
         if (accepted.has(id)) continue;
@@ -243,16 +299,22 @@ export async function translateProject(
       .filter((i) => i.editedByHand)
       .map(({ target, locale, key }) => ({ target, locale, key }));
   }
+  checkCancelled();
   return result;
 }
 
-async function callWithRetry<T>(fn: () => Promise<T>, tries = 3): Promise<T> {
+async function callWithRetry<T>(fn: () => Promise<T>, signal?: AbortSignal, tries = 3): Promise<T> {
   for (let i = 1; ; i++) {
+    if (signal?.aborted) throw new UserError("Translation cancelled");
     try {
       return await fn();
     } catch (e) {
       if (!(e instanceof ProviderError) || !e.transient || i >= tries) throw e;
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** i));
+      try {
+        await delay(1000 * 2 ** i, undefined, { signal });
+      } catch {
+        throw new UserError("Translation cancelled");
+      }
     }
   }
 }

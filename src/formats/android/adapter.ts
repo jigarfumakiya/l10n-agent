@@ -45,6 +45,7 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
     const rootAttrs = new Map<string, Array<[string, string]>>();
     /** Existing translation files, kept as text so updates are spliced in and comments survive. */
     const localeFiles = new Map<string, LocaleFile>();
+    let hasQualifiedStrings = false;
 
     const target: Target = {
       id,
@@ -77,8 +78,10 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
       .sort();
     for (const dir of dirs) {
       const locale = folderToLocale(dir);
-      if (locale === undefined) continue;
-      const catalog: Catalog = locale === null ? source : { locale, entries: new Map() };
+      // Inspect other configurations for coverage, but never merge their overrides into
+      // a plain locale or let the writer flatten them into values-<locale>.
+      const catalog: Catalog =
+        locale === null ? source : { locale: locale ?? sourceLocale, entries: new Map() };
       const xmlFiles = (await fs.listDir(path.join(resDir, dir)))
         .filter((f) => !f.isDirectory && f.name.endsWith(".xml"))
         .map((f) => f.name)
@@ -104,6 +107,26 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
         }
         const resources = doc.root;
         if (resources?.name !== "resources") continue;
+        if (locale === undefined) {
+          const qualified: Catalog = { locale: sourceLocale, entries: new Map() };
+          readEntries(doc, resources, rel, qualified, (issue) =>
+            issues.push({ ...issue, target: id }),
+          );
+          if (qualified.entries.size > 0) hasQualifiedStrings = true;
+          const entries = [...qualified.entries.values()].filter((e) => e.translatable);
+          if (entries.length > 0) {
+            issues.push({
+              severity: "warning",
+              blocksCompleteness: true,
+              code: "resource-configuration-unsupported",
+              message: `${entries.length} string resource${entries.length === 1 ? "" : "s"} in ${dir} use configuration qualifiers that Localship cannot validate or translate. Preserved unchanged; check this configuration with Android lint and on a device.`,
+              target: id,
+              file: rel,
+              line: entries[0]?.line,
+            });
+          }
+          continue;
+        }
         const before = catalog.entries.size;
         const spans = new Map<string, Span>();
         readEntries(
@@ -122,7 +145,19 @@ export const androidAdapter: FormatAdapter<AndroidTarget> = {
           );
         }
       }
-      if (locale !== null && catalog.entries.size > 0) locales.set(locale, catalog);
+      if (locale !== null && locale !== undefined && catalog.entries.size > 0)
+        locales.set(locale, catalog);
+    }
+
+    if (source.entries.size === 0 && (locales.size > 0 || hasQualifiedStrings)) {
+      issues.push({
+        severity: "error",
+        code: "default-resources-missing",
+        message:
+          "String resources exist in qualified folders, but this target has no default strings in values. Restore the defaults or configure the target containing them; verify merged resources with Android lint.",
+        target: id,
+        file: relativePath(root, path.join(resDir, "values")),
+      });
     }
 
     async function writeLocale(catalog: Catalog): Promise<WriteResult> {

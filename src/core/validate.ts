@@ -1,6 +1,7 @@
 import type { Target } from "../formats/types.js";
 import { checkGlossary, type GlossaryTerm, onlyKeptTerms } from "./context.js";
 import { hashMessage } from "./hash.js";
+import { getLockEntry } from "./lock.js";
 import {
   type Entry,
   type Issue,
@@ -10,12 +11,15 @@ import {
 } from "./model.js";
 import { type Project, projectLocales } from "./project.js";
 import { inconsistencies, lengthCheck, roleOf, textChecks, type UiRole } from "./qa.js";
+import { entryState } from "./status.js";
 import type { UsageIndex } from "./usage.js";
 
 export interface ValidateOptions {
   locales?: string[];
-  /** Treat untranslated strings and missing locales as errors. */
+  /** Treat missing translations, unverifiable defaults and skipped content as errors. */
   strict?: boolean;
+  /** Require current, approved translations for every selected locale. Implies strict. */
+  requireApproved?: boolean;
   /** Where strings are used in code, so a string's role (button, tab…) can be checked. */
   usages?: UsageIndex;
 }
@@ -23,9 +27,21 @@ export interface ValidateOptions {
 /** Deterministic checks for every target, its source strings and each locale. */
 export function validateProject(project: Project, opts: ValidateOptions = {}): Issue[] {
   const locales = opts.locales ?? projectLocales(project);
+  const strict = opts.strict || opts.requireApproved;
   const issues: Issue[] = [];
+  if (opts.requireApproved && locales.length === 0) {
+    issues.push({
+      severity: "error",
+      code: "locales-empty",
+      message: "No target locales to check; configure locales or select them with --locale",
+    });
+  }
   for (const { target: loaded } of project.targets) {
-    issues.push(...loaded.issues);
+    issues.push(
+      ...loaded.issues.map((issue) =>
+        strict && issue.blocksCompleteness ? { ...issue, severity: "error" as const } : issue,
+      ),
+    );
     const at = (e: Entry, locale: string) => ({
       target: loaded.id,
       locale,
@@ -45,7 +61,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
       const catalog = loaded.locales.get(locale);
       if (!catalog) {
         issues.push({
-          severity: opts.strict ? "error" : "info",
+          severity: strict ? "error" : "info",
           code: "locale-missing",
           message: `No ${locale} translations yet`,
           target: loaded.id,
@@ -68,7 +84,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
       for (const src of loaded.source.entries.values()) {
         if (src.translatable && !catalog.entries.has(src.key)) {
           missing++;
-          if (opts.strict) {
+          if (strict) {
             issues.push({
               ...at(src, locale),
               severity: "error",
@@ -78,7 +94,7 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
           }
         }
       }
-      if (missing > 0 && !opts.strict) {
+      if (missing > 0 && !strict) {
         issues.push({
           severity: "info",
           code: "missing",
@@ -93,9 +109,12 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
         if (!src) {
           issues.push({
             ...where,
-            severity: "warning",
+            severity: strict && loaded.format === "android-xml" ? "error" : "warning",
             code: "orphan",
-            message: "Not in the source strings any more",
+            message:
+              loaded.format === "android-xml"
+                ? "No matching default resource in this target's values folder; restore the default, or remove this translation only if the key is no longer used. Check merged resources with Android lint."
+                : "Not in the source strings any more",
           });
           continue;
         }
@@ -110,6 +129,27 @@ export function validateProject(project: Project, opts: ValidateOptions = {}): I
           continue;
         }
         if (!src.translatable) continue;
+        if (opts.requireApproved) {
+          const state = entryState(
+            src,
+            tgt,
+            getLockEntry(project.lock, loaded.id, locale, src.key),
+          );
+          if (state !== "approved") {
+            const reason =
+              state === "stale"
+                ? "Source changed since this translation was recorded"
+                : state === "edited"
+                  ? "Translation was edited since it was recorded"
+                  : `Translation is ${state}`;
+            issues.push({
+              ...where,
+              severity: "error",
+              code: "not-approved",
+              message: `${reason}; review it against the current source and approve it`,
+            });
+          }
+        }
         issues.push(
           ...checkTranslation(loaded, spec, src, tgt, {
             locale,

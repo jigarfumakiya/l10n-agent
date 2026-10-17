@@ -62,7 +62,11 @@ describe("status", () => {
     const notes = statusNotes(await openProject(fs, { cwd: "/app" }));
     expect(notes.map((n) => [n.locale, n.code, n.message])).toEqual([
       [undefined, "duplicate-key", "1 key is defined twice; run `localship validate` for where"],
-      ["hi", "orphan", "1 translation of deleted strings; `localship prune` removes it"],
+      [
+        "hi",
+        "orphan",
+        "1 translation without a matching source; restore missing defaults or, after confirming the keys are unused, remove them with `localship prune`",
+      ],
     ]);
   });
 });

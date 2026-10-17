@@ -42,6 +42,9 @@ not translatable.
 
 - Put strings in `res/values/strings.xml` of the module that uses them. Create the file if needed:
   `<?xml version="1.0" encoding="utf-8"?>` then `<resources>…</resources>`.
+  Keep a default for every resource the app uses; a definition only in `values-en` is not a default.
+  Check the merged resources with Android lint for the relevant build variants, especially when
+  libraries, flavors or multiple source sets supply defaults.
 - Key names: `screen_role` in snake_case (`budget_title`, `budget_save_button`). Reuse an existing
   key when the text *and* meaning are the same; otherwise make a new one.
 - Add a comment above each string saying where it appears and what placeholders mean:
@@ -55,30 +58,54 @@ not translatable.
 - Outside composables: `context.getString(…)` / `resources.getQuantityString(…)`. Don't pass a
   `Context` into a ViewModel: expose `@StringRes` ids, or a small `UiText` wrapper resolved in the UI.
 - Money, numbers and dates go through formatters (`NumberFormat`, `DateTimeFormatter.ofLocalizedDate`),
-  never hand-built strings.
+  never hand-built strings. Keep the amount signed and set its actual currency; changing the display
+  language must not change the currency. Respect the user's regional and numbering preferences.
 - Brand names that must not change: `<string name="app_name" translatable="false">…</string>`.
+- Check `android:supportsRtl`, start/end spacing and alignment, and directional icons. Mirror
+  directional navigation affordances when appropriate; do not mirror every image or chart blindly.
+- Localship handles plain locale folders. Qualified string resources such as `values-ar-night`
+  remain separate; a coverage warning must be resolved with platform checks, not by moving those
+  strings into a plain locale folder or removing the qualifiers.
 
 ## 3. iOS rules
 
-- A String Catalog must exist. If there is none, ask the user to add one in Xcode
-  (File › New › File from Template › String Catalog, named `Localizable`) or create
-  `Localizable.xcstrings` in the app target's folder containing
-  `{"sourceLanguage" : "en", "strings" : {}, "version" : "1.0"}`. In Xcode 16 synced folders it
-  is picked up automatically; otherwise it must be added to the target in Xcode.
+- Use String Catalogs and the project's actual development language; never assume English.
+  Reuse existing tables. For a new catalog, use Xcode's localization preparation tools when
+  available, or create `Localizable.xcstrings` in the appropriate target with `sourceLanguage`
+  matching the development language, an empty `strings` object and `version: "1.0"`.
+  Verify target membership and resource inclusion, including extensions and Swift packages.
+- Verify **Use Compiler to Extract Swift Strings** (`SWIFT_EMIT_LOC_STRINGS`) for the relevant
+  targets. Build all relevant schemes/targets and supported platforms before translating;
+  building only the main app may miss platform-conditional strings and extension resources.
 - `Text("literal")`, `Button("literal")`, `Label("literal", …)` are extracted by Xcode
   automatically. Add a comment where the meaning isn't obvious: `Text("Save", comment: "Saves the budget")`.
-- Text in variables: make it `String(localized: "…", comment: "…")` where it's created, or type the
-  property as `LocalizedStringResource` / `LocalizedStringKey`.
+- Prefer `LocalizedStringResource` for passing localizable text through models and custom views;
+  use `String(localized:)` where a resolved string is needed. Avoid caching resolved translations
+  across language changes. `LocalizedStringKey` also works for SwiftUI-specific view APIs.
+- Specify the right table and bundle for non-default catalogs, frameworks and packages.
+  On toolchains supporting it, `#bundle` refers to the current target's resources; otherwise use
+  the appropriate bundle, such as `Bundle.module` in a Swift package, rather than assuming `.main`.
+- Xcode 26+ can generate typed `LocalizedStringResource` symbols for manually managed keys;
+  respect an existing symbol-based workflow. It also offers automatic translator comments;
+  review generated comments and add app-specific meaning and placeholder context.
 - Use `Text(verbatim:)` for text that must never be translated (codes, user content).
 - Interpolations become placeholders automatically: `Text("\(count) items")` → key `%lld items`.
-  Counts need plural forms: list those strings and tell the user to right-click them in the
-  catalog › Vary by Plural, since that's done in Xcode.
+  Counts need plural forms: use the catalog's **Vary by Plural** or available Xcode tools.
+  Multiple independent counts require substitutions; device wording may require device variants.
+  Localship cannot translate or validate those advanced entries yet. Keep their structure and
+  use Xcode to handle them; never flatten them to make Localship's checks pass.
 - Money, numbers and dates: `.formatted()` and `FormatStyle`, never hand-built strings.
-- **Build once** (in Xcode, or `xcodebuild … build`) so Xcode collects the strings into the catalog.
+- Include user-facing permission descriptions and other localizable Info.plist values through
+  `InfoPlist.xcstrings`, plus storyboard/xib and App Intents text where the app uses them.
+- Xcode 27 has native agent localization and preview tools. When available, use them for project
+  preparation and visual review, keeping the same glossary and voice guidance. If they edit
+  translations tracked by Localship, review the resulting hand edits before adopting them.
 
 ## 4. Check nothing was missed
 
-- The app must build after each chunk. Don't change logic, layout or behavior.
+- The app must build after each chunk. Don't change logic, layout or behavior. Run Android lint
+  for affected variants, or build the affected Apple targets/platforms; file validation alone
+  cannot verify resource merging, extraction or runtime lookups.
 - Android: enable pseudolocales (`android { buildTypes { debug { isPseudoLocalesEnabled = true } } }`),
   switch the device to "English (XA)", and look for text that isn't accented: that text is still hardcoded.
   "AR (XB)" shows right-to-left layout problems.
@@ -97,15 +124,19 @@ for them while you're in it:
 - **Text built once and kept.** View models, singletons and caches that build sentences keep the
   old language after an in-app language switch. Rebuild them when the locale changes; on Android,
   view models survive the activity being recreated for the new language.
-- **Charts drawn by hand.** A Canvas or custom drawing doesn't mirror in right-to-left languages,
-  but the labels laid out next to it do, so the bars end up under the wrong labels. Mirror the
-  drawing when the layout direction is right to left.
-- **Signs and symbols on amounts.** `"-" + amount` comes out as `$60-` in Arabic. Keep a signed
-  amount in one left-to-right run (wrap it in U+2066 … U+2069). Android's Arabic number
-  format also starts with an invisible right-to-left mark (U+200F), which can cut the symbol
-  off single-line figures; strip it.
-- **Dates and months** formatted with the device's locale instead of the app's: use the app's
-  locale so they follow an in-app language switch.
+- **Charts drawn by hand.** Check that custom drawing and surrounding labels agree in RTL.
+  Decide mirroring based on the chart's meaning and axis conventions, and test it on a device.
+- **Signs and symbols on amounts.** Format the signed value as one unit with the platform's
+  number/currency formatter. Preserve its Unicode direction marks. Do not prepend a minus sign,
+  strip U+200F or force every amount to LTR. For dynamic text inserted into an Android localized
+  message, use context-aware `BidiFormatter.unicodeWrap()` unless already wrapped. On Apple,
+  use localized interpolation and natural text direction. Test positive/negative amounts,
+  currency symbols and mixed-script text in the actual UI before adjusting directionality.
+- **Dates and months.** Check that language switching refreshes labels while formatters respect
+  intended regional preferences; language, region, calendar and currency are separate choices.
+
+Use the [platform verification guide](references/platform-localization.md) for current official
+references and the final test checklist.
 
 ## 5. Then
 

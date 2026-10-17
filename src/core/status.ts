@@ -30,6 +30,8 @@ export function entryState(
   if (!lock) return target.needsReview ? "draft" : "untracked";
   if (lock.source !== hashMessage(source.message)) return "stale";
   if (lock.target !== hashMessage(target.message)) return "edited";
+  // An editor can reopen review without changing the text (fuzzy / needs_review).
+  if (target.needsReview && lock.state === "approved") return "draft";
   return lock.state;
 }
 
@@ -91,6 +93,15 @@ export interface StatusNote {
 export function statusNotes(project: Project, locales = projectLocales(project)): StatusNote[] {
   const notes: StatusNote[] = [];
   for (const { target: loaded } of project.targets) {
+    for (const issue of loaded.issues) {
+      if (!issue.blocksCompleteness || issue.severity === "error") continue;
+      notes.push({
+        target: loaded.id,
+        severity: "warning",
+        code: issue.code,
+        message: `${issue.file ? `${issue.file}: ` : ""}${issue.message}`,
+      });
+    }
     const errors = loaded.issues.filter((i) => i.severity === "error");
     const byCode = new Map<string, number>();
     for (const e of errors) byCode.set(e.code, (byCode.get(e.code) ?? 0) + 1);
@@ -116,7 +127,7 @@ export function statusNotes(project: Project, locales = projectLocales(project))
         locale,
         severity: "warning",
         code: "orphan",
-        message: `${orphans.length} translation${orphans.length === 1 ? "" : "s"} of deleted strings; \`localship prune\` removes ${orphans.length === 1 ? "it" : "them"}`,
+        message: `${orphans.length} translation${orphans.length === 1 ? "" : "s"} without a matching source; restore missing defaults or, after confirming the keys are unused, remove them with \`localship prune\``,
       });
     }
   }

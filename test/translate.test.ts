@@ -3,8 +3,8 @@ import { memoryFs } from "../src/core/fs.js";
 import { openProject } from "../src/core/project.js";
 import { computeStatus } from "../src/core/status.js";
 import type { BatchItem } from "../src/core/workflow.js";
-import { extractJson } from "../src/translate/prompt.js";
-import { createCompletion, parseModel } from "../src/translate/providers.js";
+import { extractJson, systemPrompt } from "../src/translate/prompt.js";
+import { createCompletion, ProviderError, parseModel } from "../src/translate/providers.js";
 import { modelFor, translateProject } from "../src/translate/translate.js";
 
 const files = (config = "") =>
@@ -46,6 +46,170 @@ function fakeModel(seen: string[]) {
 }
 
 describe("translateProject", () => {
+  it("splits large multibyte prompts without skipping entries", async () => {
+    const fs = files();
+    const source = "説明".repeat(700);
+    fs.files.set(
+      "/p/res/values/strings.xml",
+      `<resources><string name="first">${source}</string><string name="second">${source}</string><string name="third">${source}</string></resources>`,
+    );
+    const sizes: number[] = [];
+    const r = await translateProject(await openProject(fs, { cwd: "/p" }), {
+      locales: ["hi"],
+      model: "fake:model",
+      maxPromptBytes: 10_000,
+      concurrency: 2,
+      completion: () => async (req) => {
+        sizes.push(Buffer.byteLength(req.system) + Buffer.byteLength(req.user));
+        const items = JSON.parse(
+          req.user.slice(req.user.indexOf("Items to translate:") + 19),
+        ) as BatchItem[];
+        return JSON.stringify(items.map((item) => ({ ...item, value: "訳" })));
+      },
+    });
+    expect(r.translated).toBe(3);
+    expect(r.failed).toEqual([]);
+    expect(sizes).toHaveLength(3);
+    expect(sizes.every((size) => size <= 10_000)).toBe(true);
+  });
+
+  it("fails before contacting a model when one item or its context exceeds the byte budget", async () => {
+    let calls = 0;
+    await expect(
+      translateProject(await openProject(files(), { cwd: "/p" }), {
+        model: "fake:model",
+        maxPromptBytes: Buffer.byteLength(systemPrompt()),
+        completion: () => async () => {
+          calls++;
+          return "[]";
+        },
+      }),
+    ).rejects.toThrow("exceeds maxPromptBytes");
+    expect(calls).toBe(0);
+  });
+
+  it("counts retry feedback toward the prompt budget", async () => {
+    const fs = files();
+    let calls = 0;
+    await expect(
+      translateProject(await openProject(fs, { cwd: "/p" }), {
+        model: "fake:model",
+        locales: ["hi"],
+        keys: ["greeting"],
+        maxPromptBytes: 5000,
+        completion: () => async () => {
+          calls++;
+          return JSON.stringify([{ locale: "hi", key: "greeting", value: "x".repeat(10_000) }]);
+        },
+      }),
+    ).rejects.toThrow("exceeds maxPromptBytes");
+    expect(calls).toBe(1);
+    expect(fs.files.has("/p/res/values-hi/strings.xml")).toBe(false);
+  });
+
+  it("cancels retry waits without another call or writes", async () => {
+    const fs = files();
+    const controller = new AbortController();
+    let calls = 0;
+    const running = translateProject(await openProject(fs, { cwd: "/p" }), {
+      model: "fake:model",
+      locales: ["hi"],
+      signal: controller.signal,
+      completion: () => async () => {
+        calls++;
+        setTimeout(() => controller.abort(), 10);
+        throw new ProviderError("rate limited", true);
+      },
+    });
+    await expect(running).rejects.toThrow("cancelled");
+    expect(calls).toBe(1);
+    expect(fs.files.has("/p/res/values-hi/strings.xml")).toBe(false);
+  });
+
+  it("does not write a response that arrives after cancellation", async () => {
+    const fs = files();
+    const controller = new AbortController();
+    await expect(
+      translateProject(await openProject(fs, { cwd: "/p" }), {
+        model: "fake:model",
+        locales: ["hi"],
+        keys: ["save"],
+        signal: controller.signal,
+        completion: () => async () => {
+          controller.abort();
+          return JSON.stringify([{ locale: "hi", key: "save", value: "सहेजें" }]);
+        },
+      }),
+    ).rejects.toThrow("cancelled");
+    expect(fs.files.has("/p/res/values-hi/strings.xml")).toBe(false);
+  });
+
+  it("does not store an old-source response against a source changed during the request", async () => {
+    const fs = files();
+    let calls = 0;
+    const result = await translateProject(await openProject(fs, { cwd: "/p" }), {
+      model: "fake:model",
+      locales: ["hi"],
+      keys: ["save"],
+      completion: () => async () => {
+        calls++;
+        if (calls === 1) {
+          fs.files.set(
+            "/p/res/values/strings.xml",
+            (await fs.readFile("/p/res/values/strings.xml")).replace(">Save<", ">Delete<"),
+          );
+        }
+        return JSON.stringify([{ locale: "hi", key: "save", value: calls === 1 ? "सहेजें" : "हटाएं" }]);
+      },
+    });
+    expect(calls).toBe(2);
+    expect(result.translated).toBe(1);
+    expect(await fs.readFile("/p/res/values-hi/strings.xml")).not.toContain("सहेजें");
+    expect(await fs.readFile("/p/res/values-hi/strings.xml")).toContain("हटाएं");
+  });
+
+  it("reads source code once across batches and retries", async () => {
+    const fs = files();
+    const sourceFile = "/p/Main.kt";
+    fs.files.set(sourceFile, "Button(onClick = {}) { Text(stringResource(R.string.save)) }");
+    const readFile = fs.readFile;
+    let codeReads = 0;
+    fs.readFile = async (file) => {
+      if (file === sourceFile) codeReads++;
+      return readFile(file);
+    };
+    const r = await translateProject(await openProject(fs, { cwd: "/p" }), {
+      model: "fake:model",
+      batchSize: 1,
+      completion: fakeModel([]),
+    });
+    expect(r.translated).toBe(6);
+    expect(r.failed).toEqual([]);
+    expect(codeReads).toBe(1);
+  });
+
+  it("finishes when requested states include the drafts it writes", async () => {
+    const fs = files();
+    const seen: string[] = [];
+    const complete = fakeModel(seen)();
+    const r = await translateProject(await openProject(fs, { cwd: "/p" }), {
+      model: "fake:model",
+      locales: ["hi"],
+      keys: ["save", "greeting"],
+      states: ["missing", "draft"],
+      batchSize: 1,
+      concurrency: 1,
+      completion: () => async (req) => {
+        if (seen.length >= 3) throw new Error("Already completed entries were selected again");
+        return complete(req);
+      },
+    });
+    expect(r.translated).toBe(2);
+    expect(r.failed).toEqual([]);
+    expect(seen).toHaveLength(3);
+    expect(seen.filter((request) => request.includes('"key": "save"'))).toHaveLength(1);
+  });
+
   it("translates every locale, retries rejected strings with their errors, and records drafts", async () => {
     const fs = files();
     const seen: string[] = [];

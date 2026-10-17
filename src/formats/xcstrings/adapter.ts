@@ -38,8 +38,20 @@ interface StringUnit {
 }
 interface Localization {
   stringUnit?: StringUnit;
-  variations?: { plural?: Record<string, { stringUnit?: StringUnit }>; device?: unknown };
+  variations?: { plural?: Record<string, Localization>; [axis: string]: unknown };
   substitutions?: unknown;
+}
+
+/** Only a plain string or one level of plural string units is currently modeled. */
+function hasUnsupportedVariation(loc: Localization): boolean {
+  return (
+    !!loc.substitutions ||
+    (!!loc.variations &&
+      (Object.keys(loc.variations).some((axis) => axis !== "plural") ||
+        Object.values(loc.variations.plural ?? {}).some(
+          (form) => form.variations || form.substitutions,
+        )))
+  );
 }
 
 export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
@@ -137,7 +149,6 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
     }
 
     const strings = child(doc, "strings");
-    let unsupported = 0;
     for (const e of strings?.kind === "object" ? strings.entries : []) {
       const key = e.key;
       const info = (toJs(e.value) ?? {}) as {
@@ -147,17 +158,27 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
         localizations?: Record<string, Localization>;
       };
       const locs = info.localizations ?? {};
-      const variant = Object.values(locs).some((l) => l.substitutions || l.variations?.device);
-      if (variant) unsupported++;
+      const variant = Object.values(locs).some(hasUnsupportedVariation);
       const line = lineOf(e.offset);
+      const intended =
+        key !== "" && info.shouldTranslate !== false && info.extractionState !== "stale";
+      if (intended && variant) {
+        issues.push({
+          severity: "warning",
+          blocksCompleteness: true,
+          code: "variation-unsupported",
+          message:
+            "Device, nested or other unsupported variations or substitutions are present; this entire key is preserved but excluded from translation and validation. Review it in Xcode; Localship cannot certify completeness for this catalog.",
+          target: id,
+          key,
+          file: rel,
+          line,
+        });
+      }
       const base: Omit<Entry, "message"> = {
         key,
         // "" is Xcode's placeholder for empty Text(""); stale strings are gone from the code.
-        translatable:
-          key !== "" &&
-          info.shouldTranslate !== false &&
-          info.extractionState !== "stale" &&
-          !variant,
+        translatable: intended && !variant,
         file: rel,
         line,
       };
@@ -181,15 +202,6 @@ export const xcstringsAdapter: FormatAdapter<XcstringsTarget> = {
         if (found.unreviewed) entry.needsReview = true;
         catalog.entries.set(key, entry);
       }
-    }
-    if (unsupported > 0) {
-      issues.push({
-        severity: "info",
-        code: "variation-unsupported",
-        message: `${unsupported} string${unsupported === 1 ? " uses" : "s use"} device variations or substitutions, which aren't supported yet; skipped`,
-        target: id,
-        file: rel,
-      });
     }
 
     async function writeLocale(catalog: Catalog): Promise<WriteResult> {

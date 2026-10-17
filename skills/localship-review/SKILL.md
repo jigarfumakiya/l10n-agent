@@ -50,4 +50,12 @@ installed, ask to install it once with `npm install -g localship`.
    - `--from edited` accepts hand edits; `--from untracked` adopts translations made before
      the tool.
 
-Run `localship validate` at the end; it must have no errors. Commit nothing unless asked.
+Run `localship validate` at the end; it must have no errors. Report coverage warnings separately:
+unsupported variants are not reviewed just because the supported entries passed. After approval,
+use `localship validate --require-approved --locale <reviewed-locales>` for the release check.
+Do not auto-approve or flatten unsupported entries to satisfy that check.
+
+For a release, follow the [platform verification checklist](../localship-extract/references/platform-localization.md):
+native build/lint, pseudolocales, large text, RTL, language switching and native-speaker review.
+Use Xcode preview tools when available for visual checks, and report what still needs a device.
+Commit nothing unless asked.

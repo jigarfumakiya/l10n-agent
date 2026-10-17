@@ -38,8 +38,10 @@ no server, no monthly bill.
   in code before anything is written. Failures go back to the AI with the reason.
 - 🧠 **More context for the AI.** Each string comes with the code that uses it, its comment, your
   glossary and voice notes, and earlier translations of the same text.
-- 🔒 **Stays in your repo.** No server, no account, no upload. Your own translation files, formatted
-  the way your tools write them.
+- 🔒 **Your files, your workflow.** No Localship server or account. Translation files stay in your
+  repo, formatted the way your tools write them. You choose the AI that receives their content.
+- ✅ **Check before release.** Require current, approved translations in CI with
+  `localship validate --require-approved`. No model call or API key needed for the check.
 - 💻 **Runs anywhere.** Claude Code, Cursor, VS Code, Codex, Gemini CLI, Claude Desktop or the
   terminal, on macOS, Linux and Windows.
 
@@ -54,6 +56,9 @@ no server, no monthly bill.
 | Terms and tone | Drift across strings | Same glossary and voice everywhere |
 | Changed copy | Everything redone | Only what changed |
 | Your edits | Overwritten | Kept |
+
+For a comparison with Lingo.dev, Crowdin, Lokalise and i18n Ally, see the
+[plugin review](docs/plugin-review.md).
 
 ## 🎬 See it in action
 
@@ -127,6 +132,12 @@ Wherever your app is today, one sentence gets it started.
 Android string arrays and plurals, String Catalog plural variations, and gettext plural forms are
 all supported.
 
+Apple device/nested variations and substitutions, and Android strings in configuration-specific
+folders such as `values-ar-night`, are preserved but not translated or validated. Localship reports
+these coverage gaps; `validate --strict` and `--require-approved` fail rather than claim completeness.
+See [platform verification](skills/localship-extract/references/platform-localization.md) for native
+build, language setup and device checks.
+
 ## 🚀 Install
 
 **Claude Code plugin**
@@ -197,9 +208,10 @@ Your agent picks these itself; you just ask. 👀 marks tools that only read and
 
 - **Stays in your project.** Localship reads and writes only your translation files and the
   `.localship/` folder. Changes to your code are made by your agent, where you can see them.
-- **No Localship server.** No account, no telemetry. The only calls Localship makes go to a model
-  API you set up, with your own key. With your coding agent's model or a local Ollama, it sends
-  nothing over the internet.
+- **No Localship server.** No account, no telemetry. Localship's model calls go to the provider
+  you configure. When you use a cloud coding agent, that agent may send strings and context to
+  its model provider. Validation runs locally without model calls; translation can also stay
+  local when you use a locally hosted model.
 - **Nothing is final until you say so.** Translations are written as drafts, and hand edits and
   approved translations are never replaced unless you ask.
 
@@ -215,6 +227,7 @@ localship start hi,ar --model anthropic:claude-sonnet-5-5   # set up and transla
 localship status                                            # progress per language
 localship validate                                          # exits 1 on errors
 localship approve --locale hi                               # after review
+localship validate --require-approved                       # release / CI check
 ```
 
 Every command, option and config key is in the [reference](docs/reference.md).

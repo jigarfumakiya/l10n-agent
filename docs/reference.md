@@ -4,6 +4,7 @@ Everything the tool does, in detail. For getting started, see the [README](../RE
 
 - [Commands](#commands)
 - [MCP tools](#mcp-tools)
+- [Release checks in CI](#release-checks-in-ci)
 - [Translation workflow](#translation-workflow)
 - [Context files](#context-files)
 - [Configuration](#configuration)
@@ -42,10 +43,13 @@ Options:
 | `-n, --limit`, `--offset` | `next-batch` | Batch size (default 40) and paging |
 | `-m, --model <provider:model>` | `submit`, `translate` | Model to record, or to translate with |
 | `-n, --batch-size`, `-p, --parallel` | `translate` | Strings per call (30) and calls at once (4) |
+| `--max-prompt-bytes <n>` | `translate` | Maximum UTF-8 bytes of system and user prompts (48,000), including context and retry feedback |
+| `--timeout-ms <n>` | `translate` | Deadline per model request, including response-body reading (120,000 ms) |
 | `--from draft,reviewed` | `approve` | Which entries to approve. Add `untracked` or `edited` to adopt or accept |
 | `--force` | `submit`, `translate`, `init` | Replace hand edits and reviewed or approved translations; for `init`, replace the config |
 | `--dry-run` | `submit`, `approve` | Check without writing |
-| `--strict` | `validate` | Untranslated strings and missing locales count as errors |
+| `--strict` | `validate` | Missing translations/locales, Android keys without defaults, and unsupported content count as errors |
+| `--require-approved` | `validate` | Require current, approved translations in every selected locale; implies `--strict` |
 | `-y, --yes`, `--accept 1,2` | `init` | Accept the detected setups, or only these |
 | `--source en`, `-l, --locales hi,ar` | `init` | Source language and languages to translate into |
 | `-c, --config <file>` | all | Config file (default: the nearest `.localship/config.yaml`) |
@@ -59,6 +63,60 @@ Options:
 The skills are also served as MCP prompts (`localship`, `localship-setup`, `localship-extract`, `localship-translate`, `localship-review`) for
 clients that don't read skills. Every tool takes an optional `cwd`. Without one, the server works in the project Claude Code
 names in `CLAUDE_PROJECT_DIR`, else the directory it was started in (or `-C <dir>`).
+
+## Release checks in CI
+
+`validate --strict` checks translation content and completeness. To also enforce the review
+workflow before release, run:
+
+```sh
+localship validate --require-approved
+localship validate --require-approved --locale hi,ar --json
+```
+
+The release check exits 1 for missing translations or locales, drafts, reviewed-but-not-approved
+translations, untracked translations, source changes since approval, and hand edits since approval.
+It also honors gettext `fuzzy` and Xcode `needs_review` / `new` flags, even if the text is unchanged.
+An empty locale selection is an error. All normal content checks still run. Coverage warnings
+(`variation-unsupported`, `resource-configuration-unsupported`) and Android keys without matching
+defaults become errors; other warnings remain warnings.
+This checks recorded approval and mechanical correctness, not linguistic quality or runtime layout.
+
+Coverage diagnostics carry `blocksCompleteness: true` in JSON and point to the skipped content.
+They apply to the configured target as a whole, even with a locale filter: these structures are
+not modeled as independent locale entries. Unsupported content stays untouched. A native review
+does not make it supported by Localship; the target continues to fail strict checks until the
+content can be checked. Do not remove variants or mark them non-translatable to bypass the gate.
+
+Commit `.localship/lock.json` with your translations: approval is tied to the source and translation
+hashes in that file. Review existing translations before adopting them with `approve --from untracked`;
+review hand edits before accepting them with `approve --from edited`. Do not auto-approve in CI.
+
+The check only reads files and needs no model, network request or API key. For GitHub Actions,
+install a Localship version supporting this flag as a dev dependency and commit the npm lockfile,
+then add a workflow like this:
+
+```yaml
+name: Translation checks
+on: [pull_request, push]
+permissions:
+  contents: read
+jobs:
+  translations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx --no-install localship validate --require-approved
+```
+
+Through MCP, call `localship_validate` with `{"requireApproved": true}` and optionally `locales`.
+The result has `ok: false` and actionable issues when the release check fails. Omitting this option
+keeps normal validation suitable for checking drafts during translation.
 
 ## Translation workflow
 
@@ -122,6 +180,29 @@ localship translate --model anthropic:claude-sonnet-5-5
 Batches run in parallel (`-p`, default 4) and writes happen one at a time. A rejected string goes
 back to the model once with its errors; strings that still fail are listed at the end.
 Set models per locale in the config to route hard languages to a stronger model.
+
+Batches also respect a UTF-8 prompt-size budget. This is a text-size bound, not an exact token
+count or a guarantee about a model's context/output limits. If one entry plus its context exceeds
+the budget, Localship stops with that key and sends no oversized request; shorten the context or
+increase `--max-prompt-bytes`. Retry feedback counts toward the same budget.
+
+Requests have a two-minute deadline, configurable with `--timeout-ms`. Timeouts stop the run
+without automatic retries; HTTP 429 and server errors still receive bounded retries. Ctrl+C or
+SIGTERM cancels model requests and retry waits. Already saved drafts remain, and an active file
+write finishes before shutdown. MCP `localship_translate` accepts `batchSize`, `concurrency`,
+`maxPromptBytes`, and `timeoutMs`, and forwards client cancellation. Delegated submissions reject
+responses based on source text that changed while the model was working.
+
+`submit`, `approve`, `remove`, `prune`, and delegated submissions use a cooperative project lock
+at `.localship/write.lock`, then reload the project before checking and writing. A competing
+Localship writer receives a retryable-by-the-user error rather than overwriting stale data.
+The lock covers resource files and translation-state updates; model calls do not hold it.
+Dry runs do not acquire it. Locks are released on ordinary errors. After a crash, inspect the
+lock's PID/host metadata and verify that no writer is running before removing the file.
+This coordinates these commands within the same project root on a local filesystem. It does
+not lock external editors, setup/context edits, or different projects sharing resource files,
+and it does not make a multi-file update a crash-atomic transaction. Review the diff and rerun
+validation after an interrupted disk write. Temporary output filenames are unique per write.
 
 **Review and approve.** Drafts already ship in Android and gettext files (String Catalogs mark
 them `needs_review`). Review them with the `localship-review` skill or by hand, then
@@ -226,7 +307,7 @@ translation.
 |---|---|
 | Android `res/values*/strings.xml` | ✅ Supported |
 | gettext `.po` / `.pot` | ✅ Supported |
-| Apple String Catalog `.xcstrings` | ✅ Supported (device variations and substitutions skipped for now) |
+| Apple String Catalog `.xcstrings` | ✅ Strings and simple plurals (advanced variants/substitutions block strict checks) |
 | JSON (flat, nested, i18next, ICU) | Planned |
 | Flutter ARB | Planned |
 | Apple `.strings` / `.stringsdict` | Planned |
@@ -259,14 +340,19 @@ translation.
   translation may vary by plural even when the source doesn't, as Xcode allows.
 - **States:** `needs_review` and `new` count as drafts. `shouldTranslate: false` and stale entries are skipped.
 - **Placeholders:** `%@`, `%lld`, `%1$@`, `%#@name@`. `%d` and `%lld` count as the same kind of argument.
+- **Coverage:** device variations, substitutions, nested variations and unknown variation axes
+  are preserved and reported per key with file/line locations. The entire affected key is excluded
+  from batches and counts. Normal validation and status warn; strict and release checks fail.
+  Intentionally non-translatable and stale extraction entries do not block completeness.
 - **Writing:** untouched parts are written back byte for byte. Changed parts use the file's own
   style. For Xcode files that means 2-space indent, `" : "`, sorted keys, blank-line empty
   objects and no final newline, so Xcode reopens the file without a diff.
 
 ## Checks
 
-Errors are things that break the build or the app at runtime. Warnings are things that read wrong.
-`submit` refuses errors, and also asks for every plural form the language uses.
+Errors identify mechanical failures or unmet validation policy. Warnings identify potential quality
+problems, source mismatches and coverage limits. `submit` refuses translation-content errors and
+asks for every required plural form. Project coverage and approval policies are checked by `validate`.
 
 | Code | Severity | What |
 |---|---|---|
@@ -280,6 +366,10 @@ Errors are things that break the build or the app at runtime. Warnings are thing
 | `xml-malformed`, `po-malformed`, `json-malformed`, `duplicate-key`, `name-missing` | error | File problems, with line numbers |
 | `plural-forms-invalid`, `plural-forms-missing` | error | Broken or missing gettext `Plural-Forms` header |
 | `target-missing` | error | A configured path doesn't exist |
+| `default-resources-missing` | error | Android has qualified string resources but no default strings in the configured target's `values` folder |
+| `variation-unsupported`, `resource-configuration-unsupported` | warning / error | Content is preserved but cannot be checked; errors with `--strict` or `--require-approved` |
+| `not-approved` | error with `--require-approved` | Translation is a draft, reviewed, untracked, stale or edited; review against the current source and approve |
+| `locales-empty` | error with `--require-approved` | No target locales selected, configured or discovered |
 | `placeholder-not-positional` | warning | A source with several unnumbered placeholders should number them so translators can reorder |
 | `markup-mismatch`, `whitespace`, `untranslated`, `escape-unknown` | warning | Markup or edge whitespace changed, or text left in the source language (names the glossary keeps don't count) |
 | `glossary-keep`, `glossary-term` | warning | A kept name was changed, or a fixed term wasn't used |
@@ -289,9 +379,17 @@ Errors are things that break the build or the app at runtime. Warnings are thing
 | `token-missing` | warning | A link, email address or emoji from the source is missing or changed |
 | `inconsistent` | warning | The same source text is translated more than one way in a language, across all targets. Fine when the context differs; gettext contexts count as different, and a translation with a note is left out |
 | `too-long` | warning | A button, tab, chip, menu item or app name translated more than twice as wide as the source (at least 6 characters more). The role comes from the code that uses the string; Chinese, Japanese and Korean characters count double |
-| `orphan`, `not-translatable` | warning | Leftover translations to clean up |
+| `orphan` | warning / error | Translation has no matching source. For Android this may be a missing default, so strict/release checks fail. Restore the default or verify the key is unused before pruning |
+| `not-translatable` | warning | Translation differs from a source marked not translatable |
 | `plural-forms-unexpected`, `plural-forms-unknown`, `language-mismatch`, `source-language-mismatch` | warning | Header or config disagrees with the language or file |
-| `missing`, `locale-missing`, `variation-unsupported` | info | Untranslated strings and skipped content (errors with `--strict`) |
+| `missing`, `locale-missing` | info / error | Untranslated strings and missing locales (errors with `--strict` or `--require-approved`) |
+
+Localship checks configured resource directories, not Android's merged resource graph. Confirm
+defaults supplied by dependencies/flavors with native build and lint checks. Other Android
+configuration folders are inspected for string resources, then reported as unsupported; unrelated
+colors and dimensions do not create coverage warnings. See the
+[platform verification guide](../skills/localship-extract/references/platform-localization.md) for
+Android and Apple setup, runtime testing and official references.
 
 Checks are tested on real data: AndroidX and RevenueCat resources (207 locale folders), Django
 admin's PO files in 11 languages, and 9 real String Catalogs. On that data they found genuine

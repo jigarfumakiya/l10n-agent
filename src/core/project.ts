@@ -72,6 +72,21 @@ export function reopenProject(project: Project): Promise<Project> {
   return openProject(project.fs, { cwd: project.root, config: project.configFile });
 }
 
+/** Reload under the lock so an earlier snapshot cannot overwrite another writer's work. */
+export async function withProjectWrite<T>(
+  project: Project,
+  dryRun: boolean | undefined,
+  run: (fresh: Project) => Promise<T>,
+): Promise<T> {
+  if (dryRun) return run(project);
+  return project.fs.withLock(path.join(project.root, ".localship", "write.lock"), async () => {
+    const fresh = await reopenProject(project);
+    const result = await run(fresh);
+    project.lock = fresh.lock;
+    return result;
+  });
+}
+
 /** The loaded target with this id. */
 export function findTarget(project: Project, id: string): Target | undefined {
   return project.targets.find((t) => t.target.id === id)?.target;

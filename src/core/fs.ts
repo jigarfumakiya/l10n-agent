@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { promises as fsp } from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { UserError } from "./errors.js";
 
 /** File access is injected so the core stays testable and embeddable. Paths are absolute. */
 export interface FileSystem {
@@ -8,15 +11,47 @@ export interface FileSystem {
   writeFile(file: string, content: string): Promise<void>;
   exists(file: string): Promise<boolean>;
   listDir(dir: string): Promise<Array<{ name: string; isDirectory: boolean }>>;
+  /** Exclusive cooperative write lock; fails promptly if another writer owns it. */
+  withLock<T>(file: string, run: () => Promise<T>): Promise<T>;
+}
+
+function busy(file: string): UserError {
+  return new UserError(
+    `Another Localship write is in progress (${file}). Retry after it finishes. If a process crashed, verify no writer is running before removing this lock.`,
+  );
 }
 
 export const nodeFs: FileSystem = {
   readFile: (file) => fsp.readFile(file, "utf8"),
   async writeFile(file, content) {
     await fsp.mkdir(path.dirname(file), { recursive: true });
-    const tmp = `${file}.${process.pid}.tmp`;
-    await fsp.writeFile(tmp, content, "utf8");
-    await fsp.rename(tmp, file);
+    const tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await fsp.writeFile(tmp, content, { encoding: "utf8", flag: "wx" });
+      await fsp.rename(tmp, file);
+    } finally {
+      await fsp.rm(tmp, { force: true });
+    }
+  },
+  async withLock(file, run) {
+    await fsp.mkdir(path.dirname(file), { recursive: true });
+    const handle = await fsp.open(file, "wx").catch((e: NodeJS.ErrnoException) => {
+      if (e.code === "EEXIST") throw busy(file);
+      throw e;
+    });
+    try {
+      await handle.writeFile(
+        JSON.stringify({
+          pid: process.pid,
+          host: os.hostname(),
+          started: new Date().toISOString(),
+        }),
+      );
+      return await run();
+    } finally {
+      await handle.close();
+      await fsp.unlink(file);
+    }
   },
   async exists(file) {
     try {
@@ -37,10 +72,21 @@ export function memoryFs(files: Record<string, string> = {}): FileSystem & {
   files: Map<string, string>;
 } {
   const map = new Map(Object.entries(files));
+  const locks = new Set<string>();
   const norm = (p: string) => p.replace(/\\/g, "/").replace(/^[A-Za-z]:/, "");
   const dirPrefix = (dir: string) => (norm(dir).endsWith("/") ? norm(dir) : `${norm(dir)}/`);
   return {
     files: map,
+    async withLock(file, run) {
+      const key = norm(file);
+      if (locks.has(key)) throw busy(file);
+      locks.add(key);
+      try {
+        return await run();
+      } finally {
+        locks.delete(key);
+      }
+    },
     async readFile(file) {
       const v = map.get(norm(file));
       if (v === undefined) throw new Error(`ENOENT: ${file}`);

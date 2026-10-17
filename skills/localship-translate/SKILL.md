@@ -24,6 +24,9 @@ You translate. Don't edit translation files by hand.
 ## 1. Size up the work
 
 Run `localship status`. Count `missing` + `stale` across the locales to translate.
+Read the status notes too. Unsupported Apple variations and Android configurations are excluded
+from the counts; report them as uncovered work and preserve their structure. Zero remaining
+batch entries does not mean those strings have been translated or validated.
 
 - **Up to a few hundred strings:** translate them yourself (step 2).
 - **More than that**, or the user wants it done without you: delegate to a model API with
@@ -96,6 +99,9 @@ come out generic.
 ## 3. Finish
 
 - Run `localship validate`. It must have no errors.
+- Resolve or explicitly report coverage warnings. `validate --strict` checks completeness;
+  after review and approval, `validate --require-approved` also enforces approval. Unsupported
+  content blocks both checks; use the platform tools for that content and report the limitation.
 - Run `localship status` and report per locale: how many drafts were written, anything that
   failed, warnings you left and why, and terms you were unsure of.
 - **Don't approve your own drafts.** Suggest the user reviews them (the `localship-review` skill),

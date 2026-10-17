@@ -20,6 +20,7 @@ import {
 import { detect } from "../detect/detect.js";
 import { hardcodedNotes } from "../detect/hardcoded.js";
 import { translateProject } from "../translate/translate.js";
+import { withCliCancellation } from "./cancellation.js";
 import { runInit } from "./init-command.js";
 import {
   describeDetect,
@@ -96,23 +97,32 @@ program
   .command("validate")
   .description("Check source strings and translations; exits 1 on errors")
   .option("-l, --locale <list>", "comma-separated locales", locales)
-  .option("--strict", "untranslated strings and missing locales are errors")
+  .option("--strict", "missing translations, Android defaults and unsupported content are errors")
+  .option("--require-approved", "require current, approved translations (implies --strict)")
   .option("--json", "machine-readable output")
-  .action(async (opts: { locale?: string[]; strict?: boolean; json?: boolean }) => {
-    const project = await openProject(nodeFs, globals());
-    const issues = validateProject(project, {
-      locales: opts.locale,
-      strict: opts.strict,
-      usages: await buildUsageIndex(project),
-    });
-    const errors = issues.filter((i) => i.severity === "error").length;
-    if (opts.json) {
-      console.log(JSON.stringify({ ok: errors === 0, issues }, null, 2));
-    } else {
-      printIssues(issues);
-    }
-    process.exitCode = errors > 0 ? 1 : 0;
-  });
+  .action(
+    async (opts: {
+      locale?: string[];
+      strict?: boolean;
+      requireApproved?: boolean;
+      json?: boolean;
+    }) => {
+      const project = await openProject(nodeFs, globals());
+      const issues = validateProject(project, {
+        locales: opts.locale,
+        strict: opts.strict,
+        requireApproved: opts.requireApproved,
+        usages: await buildUsageIndex(project),
+      });
+      const errors = issues.filter((i) => i.severity === "error").length;
+      if (opts.json) {
+        console.log(JSON.stringify({ ok: errors === 0, issues }, null, 2));
+      } else {
+        printIssues(issues);
+      }
+      process.exitCode = errors > 0 ? 1 : 0;
+    },
+  );
 
 program
   .command("detect")
@@ -164,11 +174,14 @@ program
     const canTranslate = !!(opts.model ?? project.config.models?.default);
     const translated =
       canTranslate && setup.warnings.length === 0
-        ? await translateProject(project, {
-            locales: setup.addedLocales.length ? setup.addedLocales : undefined,
-            model: opts.model,
-            log: (line) => console.error(line),
-          })
+        ? await withCliCancellation((signal) =>
+            translateProject(project, {
+              signal,
+              locales: setup.addedLocales.length ? setup.addedLocales : undefined,
+              model: opts.model,
+              log: (line) => console.error(line),
+            }),
+          )
         : undefined;
     if (opts.json) {
       console.log(JSON.stringify({ setup, translated }, null, 2));
@@ -399,6 +412,8 @@ program
   .option("-m, --model <provider:model>", "model for every locale (default: models in the config)")
   .option("-n, --batch-size <n>", "strings per model call", count, 30)
   .option("-p, --parallel <n>", "model calls at once", count, 4)
+  .option("--max-prompt-bytes <n>", "maximum UTF-8 bytes of system and user prompt", count, 48_000)
+  .option("--timeout-ms <n>", "deadline per model request, including response body", count, 120_000)
   .option("--force", "replace hand edits and reviewed or approved translations")
   .option("--json", "machine-readable output")
   .action(
@@ -409,22 +424,29 @@ program
       states?: EntryState[];
       model?: string;
       batchSize: number;
+      maxPromptBytes: number;
+      timeoutMs: number;
       parallel: number;
       force?: boolean;
       json?: boolean;
     }) => {
       const project = await openProject(nodeFs, globals());
-      const result = await translateProject(project, {
-        locales: opts.locale,
-        targets: opts.target,
-        keys: opts.keys,
-        states: opts.states,
-        model: opts.model,
-        batchSize: opts.batchSize,
-        concurrency: opts.parallel,
-        force: opts.force,
-        log: (line) => console.error(line),
-      });
+      const result = await withCliCancellation((signal) =>
+        translateProject(project, {
+          signal,
+          maxPromptBytes: opts.maxPromptBytes,
+          timeoutMs: opts.timeoutMs,
+          locales: opts.locale,
+          targets: opts.target,
+          keys: opts.keys,
+          states: opts.states,
+          model: opts.model,
+          batchSize: opts.batchSize,
+          concurrency: opts.parallel,
+          force: opts.force,
+          log: (line) => console.error(line),
+        }),
+      );
       if (opts.json) {
         console.log(JSON.stringify(result, null, 2));
       } else {
@@ -509,7 +531,7 @@ program
 program.parseAsync().catch((e: unknown) => {
   if (e instanceof UserError) {
     console.error(e.message);
-    process.exitCode = 2;
+    process.exitCode ??= 2;
     return;
   }
   throw e;

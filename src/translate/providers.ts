@@ -9,6 +9,7 @@ export interface CompletionRequest {
   system: string;
   user: string;
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 export type Complete = (req: CompletionRequest) => Promise<string>;
@@ -65,12 +66,18 @@ export interface ProviderOptions {
   custom?: Record<string, ProviderConfig>;
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
+  /** Deadline for headers and response body; default two minutes. */
+  timeoutMs?: number;
 }
 
 export function createCompletion(spec: string, opts: ProviderOptions = {}): Complete {
   const { provider, model } = parseModel(spec);
   const env = opts.env ?? process.env;
   const doFetch = opts.fetch ?? fetch;
+  const timeoutMs = opts.timeoutMs ?? 120_000;
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
+    throw new UserError("timeoutMs must be a positive integer no greater than 2147483647");
+  }
   const custom = opts.custom?.[provider];
   const builtIn = BUILT_IN[provider];
   if (!custom && !builtIn) {
@@ -90,30 +97,49 @@ export function createCompletion(spec: string, opts: ProviderOptions = {}): Comp
     throw new UserError(`Set ${keyNames[0]} to use ${provider} models.`);
   }
 
-  const post = async (url: string, headers: Record<string, string>, body: unknown) => {
-    let res: Response;
+  const post = async (
+    url: string,
+    headers: Record<string, string>,
+    body: unknown,
+    external?: AbortSignal,
+  ) => {
+    const deadline = new AbortController();
+    const signal = external ? AbortSignal.any([external, deadline.signal]) : deadline.signal;
+    const timer = setTimeout(() => deadline.abort(), timeoutMs);
     try {
-      res = await doFetch(url, {
+      signal.throwIfAborted();
+      const res = await doFetch(url, {
         method: "POST",
         headers: { "content-type": "application/json", ...headers },
         body: JSON.stringify(body),
+        signal,
       });
+      const text = await res.text();
+      signal.throwIfAborted();
+      if (!res.ok) {
+        throw new ProviderError(
+          `${provider} returned ${res.status}: ${text.slice(0, 500)}`,
+          res.status === 429 || res.status >= 500,
+        );
+      }
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        throw new ProviderError(
+          `${provider} returned something that isn't JSON: ${text.slice(0, 200)}`,
+        );
+      }
     } catch (e) {
+      if (external?.aborted) throw new UserError("Translation cancelled");
+      if (deadline.signal.aborted) {
+        throw new ProviderError(
+          `${provider}: request timed out after ${timeoutMs} ms; retry or increase --timeout-ms`,
+        );
+      }
+      if (e instanceof ProviderError) throw e;
       throw new ProviderError(`${provider}: could not reach ${baseUrl} (${(e as Error).message})`);
-    }
-    const text = await res.text();
-    if (!res.ok) {
-      throw new ProviderError(
-        `${provider} returned ${res.status}: ${text.slice(0, 500)}`,
-        res.status === 429 || res.status >= 500,
-      );
-    }
-    try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      throw new ProviderError(
-        `${provider} returned something that isn't JSON: ${text.slice(0, 200)}`,
-      );
+    } finally {
+      clearTimeout(timer);
     }
   };
 
@@ -128,6 +154,7 @@ export function createCompletion(spec: string, opts: ProviderOptions = {}): Comp
           system: req.system,
           messages: [{ role: "user", content: req.user }],
         },
+        req.signal,
       )) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
       if (data.stop_reason === "max_tokens") {
         throw new ProviderError(`${provider}: the response was cut off; use a smaller batch`);
@@ -147,6 +174,7 @@ export function createCompletion(spec: string, opts: ProviderOptions = {}): Comp
           { role: "user", content: req.user },
         ],
       },
+      req.signal,
     )) as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }> };
     const choice = data.choices?.[0];
     if (choice?.finish_reason === "length") {

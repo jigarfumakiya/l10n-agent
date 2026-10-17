@@ -5,7 +5,13 @@ import { UserError } from "./errors.js";
 import { hashMessage } from "./hash.js";
 import { getLockEntry, type Lockfile, type StoredState, setLockEntry, writeLock } from "./lock.js";
 import { displayKey, type Entry, type Message, messageValues } from "./model.js";
-import { findTarget, type Project, projectLocales, reopenProject } from "./project.js";
+import {
+  findTarget,
+  type Project,
+  projectLocales,
+  reopenProject,
+  withProjectWrite,
+} from "./project.js";
 import { roleOf, type UiRole } from "./qa.js";
 import { type EntryState, editedByHand, entryState } from "./status.js";
 import { buildUsageIndex, type Usage, type UsageIndex } from "./usage.js";
@@ -374,6 +380,8 @@ export interface SubmitResult {
 }
 
 export interface SubmitOptions {
+  /** Source snapshot used by delegated model calls, keyed by itemId. */
+  expectedSources?: Map<string, MessageValue>;
   /** Recorded in the lockfile with each draft. */
   model?: string;
   /** Replace translations a person wrote, reviewed or approved. */
@@ -394,6 +402,16 @@ export async function submit(
   project: Project,
   submissions: Submission[],
   opts: SubmitOptions = {},
+): Promise<SubmitResult> {
+  return withProjectWrite(project, opts.dryRun, (fresh) =>
+    submitUnlocked(fresh, submissions, opts),
+  );
+}
+
+async function submitUnlocked(
+  project: Project,
+  submissions: Submission[],
+  opts: SubmitOptions,
 ): Promise<SubmitResult> {
   const result: SubmitResult = { accepted: [], rejected: [], files: [], dryRun: !!opts.dryRun };
   const configured = projectLocales(project);
@@ -439,6 +457,20 @@ export async function submit(
       continue;
     }
     const { target, src } = found;
+    const expected = opts.expectedSources?.get(
+      itemId({ target: target.id, locale, key: displayKey(src.key) }),
+    );
+    if (
+      expected !== undefined &&
+      JSON.stringify(expected) !== JSON.stringify(toValue(src.message))
+    ) {
+      reject(
+        "The source changed while the model was translating; translate the current source",
+        "source-changed",
+        target.id,
+      );
+      continue;
+    }
     const id = `${target.id}\u0000${locale}\u0000${src.key}`;
     if (seen.has(id)) {
       reject("Submitted twice in one batch", "duplicate", target.id);
@@ -706,6 +738,10 @@ export interface ApproveResult {
  * unreviewed flag (gettext fuzzy, String Catalog needs_review) on approval.
  */
 export async function approve(project: Project, opts: ApproveOptions = {}): Promise<ApproveResult> {
+  return withProjectWrite(project, opts.dryRun, (fresh) => approveUnlocked(fresh, opts));
+}
+
+async function approveUnlocked(project: Project, opts: ApproveOptions): Promise<ApproveResult> {
   const locales = opts.locales ?? projectLocales(project);
   const states = opts.states ?? ["draft", "reviewed"];
   const to = opts.to ?? "approved";
@@ -784,6 +820,10 @@ export async function removeTranslations(
   project: Project,
   opts: RemoveOptions,
 ): Promise<RemoveResult> {
+  return withProjectWrite(project, opts.dryRun, (fresh) => removeUnlocked(fresh, opts));
+}
+
+async function removeUnlocked(project: Project, opts: RemoveOptions): Promise<RemoveResult> {
   if (!opts.keys?.length && !opts.states?.length) {
     throw new UserError("Say which translations to remove: keys, states (e.g. draft), or both");
   }
@@ -851,6 +891,13 @@ export interface PruneResult {
 export async function prune(
   project: Project,
   opts: { targets?: string[]; dryRun?: boolean } = {},
+): Promise<PruneResult> {
+  return withProjectWrite(project, opts.dryRun, (fresh) => pruneUnlocked(fresh, opts));
+}
+
+async function pruneUnlocked(
+  project: Project,
+  opts: { targets?: string[]; dryRun?: boolean },
 ): Promise<PruneResult> {
   const result: PruneResult = { removed: [], lockEntries: 0, files: [], dryRun: !!opts.dryRun };
   const plan = new Map<Target, Map<string, string[]>>();

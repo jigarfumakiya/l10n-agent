@@ -60,16 +60,16 @@ export function createServer(opts: ServerOptions): McpServer {
     name: string,
     description: string,
     shape: S,
-    run: (args: z.infer<z.ZodObject<S>>) => Promise<unknown>,
+    run: (args: z.infer<z.ZodObject<S>>, signal: AbortSignal) => Promise<unknown>,
     annotations: { readOnlyHint?: boolean; destructiveHint?: boolean } = {},
   ) =>
     server.registerTool(
       name,
       { description, inputSchema: shape, annotations },
       // biome-ignore lint/suspicious/noExplicitAny: the SDK's callback type is generic over the shape.
-      (async (args: any) => {
+      (async (args: any, extra: { signal: AbortSignal }) => {
         try {
-          const out = await run(args);
+          const out = await run(args, extra.signal);
           return { content: [{ type: "text" as const, text: JSON.stringify(out, null, 2) }] };
         } catch (e) {
           if (!(e instanceof UserError)) throw e;
@@ -133,18 +133,29 @@ export function createServer(opts: ServerOptions): McpServer {
 
   tool(
     "localship_validate",
-    "Deterministic checks on source strings and translations: placeholders, plural forms, escaping, markup, glossary. ok is false when there are errors.",
+    "Deterministic checks on source strings and translations: placeholders, plural forms, escaping, markup, glossary. Use requireApproved for a release check that also requires current, approved translations. ok is false when there are errors.",
     {
       cwd: cwdArg,
       locales: localesArg,
       strict: z
         .boolean()
         .optional()
-        .describe("Untranslated strings and missing locales are errors"),
+        .describe("Missing translations, Android defaults and unsupported content are errors"),
+      requireApproved: z
+        .boolean()
+        .optional()
+        .describe(
+          "Require current, approved translations for every selected locale; implies strict",
+        ),
     },
-    async ({ cwd, locales, strict }) => {
+    async ({ cwd, locales, strict, requireApproved }) => {
       const p = await project(cwd);
-      const issues = validateProject(p, { locales, strict, usages: await buildUsageIndex(p) });
+      const issues = validateProject(p, {
+        locales,
+        strict,
+        requireApproved,
+        usages: await buildUsageIndex(p),
+      });
       return { ok: !issues.some((i) => i.severity === "error"), issues };
     },
     { readOnlyHint: true },
@@ -323,8 +334,24 @@ ${TRANSLATION_RULES}`,
       targets: targetsArg,
       keys: keysArg,
       model: z.string().optional().describe("provider:model, e.g. anthropic:claude-sonnet-5-5"),
+      batchSize: z.number().int().positive().optional().describe("Entries per call (default 30)"),
+      concurrency: z.number().int().positive().optional().describe("Calls at once (default 4)"),
+      maxPromptBytes: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("UTF-8 prompt bytes (default 48000)"),
+      timeoutMs: z
+        .number()
+        .int()
+        .positive()
+        .max(2147483647)
+        .optional()
+        .describe("Request deadline in milliseconds (default 120000)"),
     },
-    async ({ cwd, targets, ...o }) => translateProject(await project(cwd), { ...o, targets }),
+    async ({ cwd, targets, ...o }, signal) =>
+      translateProject(await project(cwd), { ...o, targets, signal }),
   );
 
   for (const name of [

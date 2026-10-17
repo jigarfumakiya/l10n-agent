@@ -49,6 +49,8 @@ export type Severity = "error" | "warning" | "info";
 
 export interface Issue {
   severity: Severity;
+  /** Content could not be checked; strict validation must not claim completeness. */
+  blocksCompleteness?: boolean;
   /** Stable, machine-readable code, e.g. `placeholder-missing`. */
   code: string;
   message: string;

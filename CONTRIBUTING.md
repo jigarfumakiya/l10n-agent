@@ -9,6 +9,7 @@ https://github.com/jigarfumakiya/localship.
 npm install
 npm run check   # typecheck + lint + tests
 npm run build   # bundles dist/cli.js
+npm run benchmark # synthetic native catalogs; no model calls
 npm run dev -- validate -C fixtures/po/django
 ```
 
@@ -52,5 +53,8 @@ an `analyze` function for checks, plural rules, and `writeLocale`. Add it to `AD
 a fixture with deliberate mistakes in `fixtures/`.
 
 ## Before a pull request
+
+For performance changes, see [performance checks](docs/performance.md) for the benchmark's scope
+and repeatable comparison procedure.
 
 `npm run check` must pass (typecheck, lint, tests). CI runs it on Linux, macOS and Windows.

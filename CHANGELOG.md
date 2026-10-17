@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- Add model request deadlines and cancellation through the CLI and MCP, including response-body
+  reads and retry waits. Bound complete prompts by UTF-8 size, including context and retry feedback.
+- Coordinate submit/approve/remove/prune writes across processes and reload inside the project
+  lock; use unique atomic-write temporary files. Reject delegated responses if their source changed.
+- Cache plural-rule samples with bounded storage and isolated copies for format-specific changes.
+  Add `npm run benchmark -- [strings-per-target]` for synthetic Android and Apple catalogs.
+- Reuse the source-code usage index during delegated translation submissions, avoiding a
+  repository rescan for every batch and retry. Do not select completed entries again when
+  requested states include drafts, preventing repeated model calls for the same translation.
+- Strict/release validation now fails on unsupported Apple variations/substitutions and Android
+  configuration-specific string resources. Diagnostics include locations; status also warns that
+  these strings are excluded from progress counts. Non-string Android resources do not trigger this.
+- Detect Android targets with localized strings but no defaults. In strict/release checks,
+  language-only keys without a matching default also fail; verify usage before pruning them.
+- Update agent guidance for bidi-safe formatting, per-app Android languages, Xcode extraction,
+  target/bundle selection, generated symbols and Xcode 27 agent workflows. Add a platform
+  verification guide with official references and native build/device checks.
+- Release check: `validate --require-approved` (MCP: `requireApproved`) requires complete,
+  current, approved translations, with actionable errors for drafts, hand edits and changed sources.
+  Runs locally without model calls; includes CI setup instructions.
+- Review flags added in Xcode or gettext after approval now reopen the translation as a draft,
+  even when the text is unchanged.
+- Clarify that cloud coding agents may send translation content to their model providers.
+
 - Consistency: a translation with a note is worded differently on purpose ("Delete account" for
   a sign-in account and for a budget), so `validate` and `submit` no longer flag it.
 

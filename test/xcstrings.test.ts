@@ -100,7 +100,11 @@ describe("xcstrings adapter", async () => {
       .map((i) => `${i.severity} ${i.locale} ${i.code}${i.form ? `[${i.form}]` : ""}`)
       .sort();
     expect(found).toEqual(
-      ["error hi placeholder-missing", "error ar plural-missing-category"].sort(),
+      [
+        "error hi placeholder-missing",
+        "error ar plural-missing-category",
+        "warning undefined variation-unsupported",
+      ].sort(),
     );
   });
 

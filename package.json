@@ -43,6 +43,7 @@
     "build": "tsup",
     "dev": "tsx src/cli/main.ts",
     "test": "vitest run",
+    "benchmark": "tsx benchmarks/localization.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome check --write .",
